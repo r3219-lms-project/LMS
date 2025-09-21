@@ -19,6 +19,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # MongoDB база данных
   mongodb:
@@ -36,10 +37,11 @@ services:
     networks:
       - lms-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/lms_mongo_db --quiet
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # Redis для кэширования
   redis:
@@ -53,10 +55,11 @@ services:
     networks:
       - lms-network
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # Основное Spring Boot приложение
   lms-app:
@@ -97,7 +100,7 @@ services:
       - ./uploads:/app/uploads
     restart: unless-stopped
 
-  # pgAdmin для управления PostgreSQL (только для разработки)
+  # pgAdmin для управления PostgreSQL
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: lms-pgadmin
@@ -117,7 +120,7 @@ services:
       - admin
     restart: unless-stopped
 
-  # Mongo Express для управления MongoDB (только для разработки)
+  # Mongo Express для управления MongoDB
   mongo-express:
     image: mongo-express:latest
     container_name: lms-mongo-express
@@ -141,7 +144,7 @@ volumes:
   postgres_data:
   mongodb_data:
   redis_data:
-  pgadmin_data:
+  pgadmin_data:  # Добавлен недостающий volume
 
 networks:
   lms-network:

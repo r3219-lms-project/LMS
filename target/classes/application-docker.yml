@@ -1,18 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB:lms_db}
-    username: ${POSTGRES_USER:lms_user}
-    password: ${POSTGRES_PASSWORD:lms_password}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/lms_db}
+    username: ${SPRING_DATASOURCE_USERNAME:lms_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:lms_password}
     driver-class-name: org.postgresql.Driver
-
-  data:
-    mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin_password@mongodb:27017/lms_mongo_db?authSource=admin}
-
-  redis:
-    host: ${SPRING_REDIS_HOST:redis}
-    port: ${SPRING_REDIS_PORT:6379}
-    password: ${SPRING_REDIS_PASSWORD:redis_password}
 
   jpa:
     hibernate:
@@ -23,12 +14,32 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin_password@localhost:27017/lms_mongo_db?authSource=admin}
+
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:redis_password}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
 server:
   port: ${SERVER_PORT:8080}
 
 logging:
   level:
-    org.springframework: INFO
     com.lms: DEBUG
+    org.springframework.data.mongodb: DEBUG
   file:
     name: /app/logs/lms-application.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
