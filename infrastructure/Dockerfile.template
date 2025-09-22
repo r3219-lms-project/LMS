@@ -55,3 +55,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Запускаем приложение с оптимизированными JVM параметрами
 ENTRYPOINT ["java", "-Xmx512m", "-Xms256m", "-XX:+UseContainerSupport", "-jar", "app.jar"]
+
+
