@@ -66,3 +66,5 @@ docker-compose --profile admin up -d
 - **Redis**: localhost:6379
 - **pgAdmin**: http://localhost:5050 (admin@lms.com / admin_password)
 - **Mongo Express**: http://localhost:8081 (admin / admin_password)
+
+
