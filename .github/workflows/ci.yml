@@ -97,7 +97,8 @@ jobs:
         run: |
           echo "✅ ТРЕБОВАНИЕ 8: Сборка JAR"
           mvn package -DskipTests -B -U
-          ls -la target/*.jar
+          echo "📦 Созданные JAR файлы:"
+          find . -name "*.jar" -type f | head -10
 
       - name: ✅ Final Summary
         run: |
