@@ -1,5 +1,5 @@
 # Многоэтапная сборка
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -13,7 +13,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Финальный образ для запуска
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:21-jre-jammy
 
 # Обновляем пакеты и устанавливаем curl для health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
