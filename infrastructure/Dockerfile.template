@@ -1,16 +1,29 @@
+# Базовый Dockerfile для микросервисов LMS
+# Скопируйте этот файл в каждый сервис и переименуйте в Dockerfile
+
 # Многоэтапная сборка
 FROM maven:3.9-eclipse-temurin-21 AS build
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем файлы Maven для кэширования зависимостей
-COPY pom.xml .
+# Копируем родительский pom.xml
+COPY ../../pom.xml ./pom.xml
+
+# Копируем общие компоненты
+COPY ../../shared ./shared
+
+# Копируем pom.xml сервиса
+COPY pom.xml ./service-pom.xml
+
+# Устанавливаем зависимости
 RUN mvn dependency:go-offline -B
 
-# Копируем исходный код и собираем
+# Копируем исходный код сервиса
 COPY src ./src
-RUN mvn clean package -DskipTests
+
+# Собираем проект
+RUN mvn clean package -DskipTests -f service-pom.xml
 
 # Финальный образ для запуска
 FROM eclipse-temurin:21-jre-jammy
@@ -28,12 +41,12 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY --from=build /app/target/*.jar app.jar
 
 # Создаем директории и устанавливаем права
-RUN mkdir -p logs uploads && chown -R appuser:appuser /app
+RUN mkdir -p logs && chown -R appuser:appuser /app
 
 # Переключаемся на пользователя
 USER appuser
 
-# Открываем порт
+# Открываем порт (измените на нужный для вашего сервиса)
 EXPOSE 8080
 
 # Health check
