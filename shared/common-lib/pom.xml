@@ -9,6 +9,7 @@
         <groupId>com.lms</groupId>
         <artifactId>lms-parent</artifactId>
         <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>common-lib</artifactId>
@@ -31,5 +32,6 @@
         </dependency>
     </dependencies>
 </project>
+
 
 

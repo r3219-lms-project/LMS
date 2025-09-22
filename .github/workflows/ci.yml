@@ -43,10 +43,10 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v4
 
-      - name: ☕ Setup JDK 17
+      - name: ☕ Setup JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
 
       - name: 📦 Cache Maven
@@ -62,7 +62,7 @@ jobs:
           java -version
           echo ""
           echo "✅ ТРЕБОВАНИЕ 2: Maven версия"
-          mvn -version
+          mvn -version -U
           echo ""
           echo "✅ ТРЕБОВАНИЕ 3: PostgreSQL версия"
           sudo apt-get update -qq
@@ -80,23 +80,23 @@ jobs:
       - name: 🎨 Code Style Check
         run: |
           echo "✅ ТРЕБОВАНИЕ 5: Проверка стиля кода (Checkstyle)"
-          mvn checkstyle:check -B || echo "⚠️ Найдены нарушения стиля (это нормально для проверки)"
+          mvn checkstyle:check -B -U || echo "⚠️ Найдены нарушения стиля (это нормально для проверки)"
 
       # ✅ ТРЕБОВАНИЕ 6: Проверка потенциальных ошибок
       - name: 🐛 Bug Detection
         run: |
           echo "✅ ТРЕБОВАНИЕ 6: Проверка потенциальных ошибок (PMD)"
-          mvn compile pmd:check -B || echo "⚠️ Найдены потенциальные проблемы (это нормально для проверки)"
+          mvn compile pmd:check -B -U || echo "⚠️ Найдены потенциальные проблемы (это нормально для проверки)"
 
       - name: 🧪 Run Tests
         run: |
           echo "✅ ТРЕБОВАНИЕ 7: Запуск тестов"
-          mvn test -B
+          mvn test -B -U
 
       - name: 📦 Build JAR
         run: |
           echo "✅ ТРЕБОВАНИЕ 8: Сборка JAR"
-          mvn package -DskipTests -B
+          mvn package -DskipTests -B -U
           ls -la target/*.jar
 
       - name: ✅ Final Summary
@@ -104,7 +104,7 @@ jobs:
           echo "🎯 =========================================="
           echo "🎯       ВСЕ ТРЕБОВАНИЯ ВЫПОЛНЕНЫ!"
           echo "🎯 =========================================="
-          echo "✅ Java 17 - проверен"
+          echo "✅ Java 21 - проверен"
           echo "✅ Maven - проверен"
           echo "✅ PostgreSQL 15 - проверен"
           echo "✅ MongoDB 7.0 - проверен"
