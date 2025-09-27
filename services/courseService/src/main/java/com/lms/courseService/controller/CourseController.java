@@ -1,5 +1,6 @@
 package com.lms.courseService.controller;
 
+import com.lms.courseService.dto.ChangeStatusRequest;
 import com.lms.courseService.model.Course;
 import com.lms.courseService.service.CourseService;
 import jakarta.validation.Valid;
@@ -46,5 +47,15 @@ public class CourseController {
     public ResponseEntity<Void> delete(@PathVariable("id") String id) {
         boolean deleted = service.delete(id);
         return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+    }
+
+    // PATCH /api/v1/courses/{id}/status  (change only status)
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Course> changeStatus(
+            @PathVariable("id") String id,
+            @Valid @RequestBody ChangeStatusRequest req) {
+
+        Course updated = service.changeStatus(id, req.getStatus());
+        return (updated == null) ? ResponseEntity.notFound().build() : ResponseEntity.ok(updated);
     }
 }
