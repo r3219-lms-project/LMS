@@ -23,6 +23,7 @@
         <module>shared/common-lib</module>
         <module>shared/database-models</module>
         <!-- Сервисы будут добавлены здесь по мере создания -->
+        <module>services/courseService</module>
     </modules>
 
     <dependencyManagement>
