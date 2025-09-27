@@ -26,4 +26,10 @@ public class CourseService {
     public Course getById(String id) {
         return repo.findById(id).orElse(null);
     }
+
+    public boolean delete(String id) {
+        if (!repo.existsById(id)) return false;
+        repo.deleteById(id);
+        return true;
+    }
 }

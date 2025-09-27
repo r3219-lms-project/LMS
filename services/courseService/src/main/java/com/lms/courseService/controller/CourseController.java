@@ -40,4 +40,11 @@ public class CourseController {
                 .created(URI.create("/api/v1/courses/" + saved.getId()))
                 .body(saved);
     }
+
+    // DELETE /api/v1/courses/{id}
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable("id") String id) {
+        boolean deleted = service.delete(id);
+        return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+    }
 }
