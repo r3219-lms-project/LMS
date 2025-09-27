@@ -1,7 +1,10 @@
 package com.lms.courseService.controller;
 
 import com.lms.courseService.dto.ChangeStatusRequest;
+import com.lms.courseService.dto.CreateCourseRequest;
+import com.lms.courseService.dto.CreateCourseResponse;
 import com.lms.courseService.dto.UpdateCourseRequest;
+import com.lms.courseService.mapper.CourseMapper;
 import com.lms.courseService.model.Course;
 import com.lms.courseService.service.CourseService;
 import jakarta.validation.Valid;
@@ -10,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+
+import static com.lms.courseService.mapper.CourseMapper.toResponse;
 
 @RestController
 @RequestMapping("/api/v1/courses")
@@ -29,18 +34,18 @@ public class CourseController {
 
     // GET /api/v1/courses/{id}
     @GetMapping("/{id}")
-    public ResponseEntity<Course> getById(@PathVariable("id") String id) {
+    public ResponseEntity<CreateCourseResponse> getById(@PathVariable("id") String id) {
         Course c = service.getById(id);
-        return (c == null) ? ResponseEntity.notFound().build() : ResponseEntity.ok(c);
+        return (c == null) ? ResponseEntity.notFound().build() : ResponseEntity.ok(toResponse(c));
     }
 
     // POST /api/v1/courses
     @PostMapping
-    public ResponseEntity<Course> create(@Valid @RequestBody Course request) {
-        Course saved = service.create(request);
+    public ResponseEntity<CreateCourseResponse> create(@Valid @RequestBody CreateCourseRequest request) {
+        Course saved = service.create(CourseMapper.toEntity(request));
         return ResponseEntity
                 .created(URI.create("/api/v1/courses/" + saved.getId()))
-                .body(saved);
+                .body(toResponse(saved));
     }
 
     // DELETE /api/v1/courses/{id}
