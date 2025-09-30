@@ -1,2 +1,2 @@
 rootProject.name = 'lms'
-include 'services:courseService'
+include 'services:courseService', 'services:userService'
