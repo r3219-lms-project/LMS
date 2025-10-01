@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="ru.lms_project.authservice.service.TokenServiceTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2025-10-01T18:47:06.454Z" hostname="arch-undndnwnkk" time="0.049">
-  <properties/>
-  <testcase name="generateAndParseAccess_ok()" classname="ru.lms_project.authservice.service.TokenServiceTest" time="0.047"/>
-  <testcase name="generateAndParseRefresh_ok()" classname="ru.lms_project.authservice.service.TokenServiceTest" time="0.002"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
