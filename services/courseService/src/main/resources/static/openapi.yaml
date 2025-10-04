@@ -1,0 +1,274 @@
+openapi: 3.0.3
+info:
+  title: LMS Course Service API
+  description: REST API for managing courses in the Learning Management System.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:8081
+    description: Local development server
+
+tags:
+  - name: Courses
+    description: Operations for creating, reading, updating and deleting courses
+
+paths:
+  /api/v1/courses:
+    get:
+      tags: [Courses]
+      summary: Get all courses
+      description: Returns the full list of courses.
+      operationId: getAllCourses
+      responses:
+        "200":
+          description: Successful retrieval of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+    post:
+      tags: [Courses]
+      summary: Create a new course
+      description: Creates a course and returns the created resource.
+      operationId: createCourse
+      requestBody:
+        required: true
+        description: Data for the new course
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourseRequest"
+      responses:
+        "201":
+          description: Course successfully created
+          headers:
+            Location:
+              description: URI of the created course
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateCourseResponse"
+        "400":
+          description: Invalid input
+
+  /api/v1/courses/{id}:
+    get:
+      tags: [Courses]
+      summary: Get a course by ID
+      description: Retrieve a specific course by its unique identifier.
+      operationId: getCourseById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Course ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Course found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateCourseResponse"
+        "404":
+          description: Course not found
+    put:
+      tags: [Courses]
+      summary: Update an existing course
+      description: Update all fields of an existing course.
+      operationId: updateCourse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Course ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: Updated course data
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourseRequest"
+      responses:
+        "200":
+          description: Course updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "400":
+          description: Invalid input
+        "404":
+          description: Course not found
+    delete:
+      tags: [Courses]
+      summary: Delete a course by ID
+      description: Permanently delete the specified course.
+      operationId: deleteCourse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Course ID
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Course deleted successfully
+        "404":
+          description: Course not found
+
+  /api/v1/courses/{id}/status:
+    patch:
+      tags: [Courses]
+      summary: Change the status of a course
+      description: Update only the status of the specified course.
+      operationId: changeCourseStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Course ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: New status for the course
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeStatusRequest"
+      responses:
+        "200":
+          description: Course status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "400":
+          description: Invalid status
+        "404":
+          description: Course not found
+
+components:
+  schemas:
+    Course:
+      type: object
+      description: Full course object
+      properties:
+        id:
+          type: string
+          example: "c_123456"
+        name:
+          type: string
+          example: "Intro to Spring"
+        description:
+          type: string
+          example: "Learn Spring Boot fundamentals."
+        students:
+          type: array
+          items:
+            type: string
+          example: ["student1", "student2"]
+        duration:
+          type: integer
+          format: int32
+          example: 30
+        status:
+          type: string
+          enum: [CREATED, IN_PROGRESS, IN_ARCHIVE]
+          example: CREATED
+      required: [id, name, duration, status]
+
+    CreateCourseRequest:
+      type: object
+      description: Payload to create a new course
+      properties:
+        name:
+          type: string
+          example: "Intro to Spring"
+        description:
+          type: string
+          example: "Learn Spring Boot fundamentals."
+        students:
+          type: array
+          items:
+            type: string
+          example: ["student1", "student2"]
+        duration:
+          type: integer
+          format: int32
+          example: 30
+        status:
+          type: string
+          enum: [CREATED, IN_PROGRESS, IN_ARCHIVE]
+          example: CREATED
+      required: [name, duration]
+
+    CreateCourseResponse:
+      type: object
+      description: Returned after creating a course
+      properties:
+        id:
+          type: string
+          example: "c_123456"
+        name:
+          type: string
+          example: "Intro to Spring"
+        description:
+          type: string
+          example: "Learn Spring Boot fundamentals."
+        students:
+          type: array
+          items:
+            type: string
+        duration:
+          type: integer
+          format: int32
+          example: 30
+        status:
+          type: string
+          enum: [CREATED, IN_PROGRESS, IN_ARCHIVE]
+          example: CREATED
+
+    UpdateCourseRequest:
+      type: object
+      description: Payload to fully update an existing course
+      properties:
+        name:
+          type: string
+          example: "Advanced Spring"
+        description:
+          type: string
+          example: "Deep dive into Spring Boot internals."
+        students:
+          type: array
+          items:
+            type: string
+        duration:
+          type: integer
+          format: int32
+          example: 45
+        status:
+          type: string
+          enum: [CREATED, IN_PROGRESS, IN_ARCHIVE]
+          example: IN_PROGRESS
+      required: [name, duration]
+
+    ChangeStatusRequest:
+      type: object
+      description: Payload to change the course status
+      properties:
+        status:
+          type: string
+          enum: [CREATED, IN_PROGRESS, IN_ARCHIVE]
+          example: IN_PROGRESS
+      required: [status]
