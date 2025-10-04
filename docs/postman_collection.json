@@ -1,0 +1,42 @@
+{
+  "info": {
+    "name": "GroupService API",
+    "_postman_id": "groups-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create group",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"courseId\": \"<uuid>\",\n  \"startDate\": \"2025-10-01\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8083/api/groups",
+          "protocol": "http",
+          "host": [ "localhost" ],
+          "port": "8083",
+          "path": [ "api", "groups" ]
+        }
+      }
+    },
+    {
+      "name": "Add user to group",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "http://localhost:8082/api/groups/{{groupId}}/users/{{userId}}",
+          "protocol": "http",
+          "host": [ "localhost" ],
+          "port": "8083",
+          "path": [ "api", "groups", "{{groupId}}", "users", "{{userId}}" ]
+        }
+      }
+    }
+  ]
+}

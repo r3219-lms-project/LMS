@@ -1,0 +1,11 @@
+infrastructure/** linguist-detectable=false
+**/mongo-init/** linguist-detectable=false
+**/init/*.js linguist-generated=true
+
+*.java linguist-detectable=true
+*.sql  linguist-detectable=true
+*.yml  linguist-detectable=true
+*.yaml linguist-detectable=true
+
+Dockerfile        linguist-language=Dockerfile
+**/Dockerfile*    linguist-language=Dockerfile

@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: group-service
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/lms_db}
+    username: ${DB_USER:lms_user}
+    password: ${DB_PASSWORD:lms_password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+server:
+  port: 8083

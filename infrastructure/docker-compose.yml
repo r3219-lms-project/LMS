@@ -1,0 +1,161 @@
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: lms-postgres
+    environment:
+      POSTGRES_DB: lms_db
+      POSTGRES_USER: lms_user
+      POSTGRES_PASSWORD: lms_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lms_user -d lms_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  group-service:
+    container_name: group-service
+    ports:
+      - "8083:8083"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/lms_db
+      DB_USER: lms_user
+      DB_PASSWORD: lms_password
+    depends_on:
+      - postgres
+    networks:
+      - lms-network
+
+  # MongoDB база данных
+  mongodb:
+    image: mongo:7-jammy
+    container_name: lms-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin_password
+      MONGO_INITDB_DATABASE: lms_mongo_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - lms-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/lms_mongo_db --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Redis для кэширования
+  redis:
+    image: redis:7-alpine
+    container_name: lms-redis
+    command: redis-server --requirepass redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Основное Spring Boot приложение (временно отключено - будет заменено на микросервисы)
+  # lms-app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: lms-application
+  #   environment:
+  #     # Database configurations
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/lms_db
+  #     SPRING_DATASOURCE_USERNAME: lms_user
+  #     SPRING_DATASOURCE_PASSWORD: lms_password
+  #     # MongoDB configuration
+  #     SPRING_DATA_MONGODB_URI: mongodb://admin:admin_password@mongodb:27017/lms_mongo_db?authSource=admin
+  #     # Redis configuration
+  #     SPRING_REDIS_HOST: redis
+  #     SPRING_REDIS_PORT: 6379
+  #     SPRING_REDIS_PASSWORD: redis_password
+  #     # Application settings
+  #     SPRING_PROFILES_ACTIVE: docker
+  #     SERVER_PORT: 8080
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     mongodb:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - lms-network
+  #   volumes:
+  #     - ./logs:/app/logs
+  #     - ./uploads:/app/uploads
+  #   restart: unless-stopped
+
+  # pgAdmin для управления PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: lms-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@lms.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - lms-network
+    profiles:
+      - admin
+    restart: unless-stopped
+
+  # Mongo Express для управления MongoDB
+  mongo-express:
+    image: mongo-express:latest
+    container_name: lms-mongo-express
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin_password
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin_password@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin_password
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - lms-network
+    profiles:
+      - admin
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  pgadmin_data:  # Добавлен недостающий volume
+
+networks:
+  lms-network:
+    driver: bridge

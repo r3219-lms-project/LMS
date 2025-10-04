@@ -1,0 +1,263 @@
+{
+	"info": {
+		"_postman_id": "task-service-collection-id",
+		"name": "LMS Task Service API",
+		"description": "Коллекция запросов для тестирования Task Service API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Get All Tasks",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/tasks",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"tasks"
+					]
+				},
+				"description": "Получить все домашние задания"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Task by ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/tasks/{{task_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"tasks",
+						"{{task_id}}"
+					]
+				},
+				"description": "Получить задание по ID"
+			},
+			"response": []
+		},
+		{
+			"name": "Create Basic Task",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Домашнее задание по математике\",\n  \"description\": \"Решить задачи 1-10 из учебника по алгебре\",\n  \"type\": \"BASIC\",\n  \"startDate\": \"2024-12-15T10:00:00\",\n  \"materials\": \"Учебник алгебры стр. 45-50, рабочая тетрадь\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/tasks",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"tasks"
+					]
+				},
+				"description": "Создать базовое домашнее задание"
+			},
+			"response": []
+		},
+		{
+			"name": "Create Test Task",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Тест по физике - Механика\",\n  \"description\": \"Тестирование знаний по разделу механика: кинематика, динамика, законы сохранения\",\n  \"type\": \"TEST\",\n  \"startDate\": \"2024-12-20T14:00:00\",\n  \"materials\": \"Конспект лекций 1-5, учебник главы 1-3\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/tasks",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"tasks"
+					]
+				},
+				"description": "Создать тестовое задание"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Task (PUT)",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Обновленное домашнее задание\",\n  \"description\": \"Обновленное описание задания с дополнительными требованиями\",\n  \"type\": \"BASIC\",\n  \"startDate\": \"2024-12-25T16:00:00\",\n  \"materials\": \"Обновленные материалы для изучения\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/tasks/{{task_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"tasks",
+						"{{task_id}}"
+					]
+				},
+				"description": "Полное обновление задания"
+			},
+			"response": []
+		},
+		{
+			"name": "Partial Update Task (PATCH)",
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"startDate\": \"2024-12-30T18:00:00\",\n  \"materials\": \"Дополнительные материалы добавлены\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/tasks/{{task_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"tasks",
+						"{{task_id}}"
+					]
+				},
+				"description": "Частичное обновление задания"
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Task",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/tasks/{{task_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"tasks",
+						"{{task_id}}"
+					]
+				},
+				"description": "Удалить задание"
+			},
+			"response": []
+		},
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/actuator/health",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"actuator",
+						"health"
+					]
+				},
+				"description": "Проверка состояния сервиса"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Metrics",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/actuator/metrics",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"actuator",
+						"metrics"
+					]
+				},
+				"description": "Получить метрики приложения"
+			},
+			"response": []
+		},
+		{
+			"name": "Swagger UI",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/tasks/swagger-ui.html",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"tasks",
+						"swagger-ui.html"
+					]
+				},
+				"description": "Открыть Swagger UI документацию"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8084",
+			"type": "string"
+		},
+		{
+			"key": "task_id",
+			"value": "",
+			"type": "string",
+			"description": "ID задания для операций с конкретным заданием"
+		}
+	]
+}
+

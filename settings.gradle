@@ -1,0 +1,2 @@
+rootProject.name = 'lms'
+include 'services:courseService', 'services:userService', 'services:groupService', 'services:taskService'
