@@ -38,7 +38,6 @@ docker-compose --profile admin up -d
 2. **Скопируйте шаблоны:**
    ```bash
    cp Dockerfile.template ../../services/your-service/Dockerfile
-   cp pom-template.xml ../../services/your-service/pom.xml
    cp application-template.yml ../../services/your-service/application.yml
    ```
 
