@@ -4,6 +4,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -18,9 +19,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +27,7 @@ public class AuthServiceImpl implements AuthService {
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
     private final TokenService tokenService;
     private final RestTemplate restTemplate;
+    private final BCryptPasswordEncoder passwordEncoder;
 
     @Value("${auth.tokens.refresh.ttl}")
     private Duration refreshTtl;
@@ -37,50 +37,153 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        String url = userServiceUrl + "/users/check-credentials";
-        UserAuthCheckResponse responseInfo;
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+        String raw = request.getPassword() == null ? "" : request.getPassword();
 
-        try {
-            responseInfo = restTemplate.postForObject(url, request, UserAuthCheckResponse.class);
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                throw new TokenValidationException("invalid_credentials");
-            }
-            if (e.getStatusCode() == HttpStatus.FORBIDDEN || e.getStatusCode() == HttpStatus.LOCKED) {
-                throw new TokenValidationException("user_inactive");
-            }
-            throw e;
+        UserDto user = getUserByEmailOrNull(email);
+        if (user == null) throw new TokenValidationException("invalid_credentials");
+        if (user.getActive() == null || !user.getActive()) throw new TokenValidationException("user_inactive");
+
+        if (!passwordEncoder.matches(raw, user.getPasswordHash())) {
+            throw new TokenValidationException("invalid_credentials");
         }
 
-        if(responseInfo == null) {
-            throw new TokenValidationException("user_service_empty_response");
-        }
-
-        if (!responseInfo.isValid()) {
-            throw new TokenValidationException("bad_credentials");
-        }
-
-        UUID userId = responseInfo.getUserId();
-        List<String> roles = responseInfo.getRoles() != null ? responseInfo.getRoles() : List.of();
-
+        List<String> roles = List.of(user.getRole());
+        UUID userId = user.getId();
         UUID sessionId = UUID.randomUUID();
 
-        String accessToken = tokenService.generateAccessToken(userId, roles);
-        String refreshToken = tokenService.generateRefreshToken(userId, sessionId);
+        String access = tokenService.generateAccessToken(userId, roles);
+        String refresh = tokenService.generateRefreshToken(userId, sessionId);
 
-        String tokenHash = hashRefresh(refreshToken);
+        String tokenHash = hashRefresh(refresh);
+        RefreshTokenSession s = new RefreshTokenSession();
+        s.setId(sessionId);
+        s.setUserId(userId);
+        s.setTokenHash(tokenHash);
+        s.setStatus(RefreshTokenStatus.ACTIVE);
+        s.setExpires(Instant.now().plus(refreshTtl));
+        refreshTokenSessionRepository.save(s);
 
-        RefreshTokenSession refreshTokenSession = new RefreshTokenSession();
-        refreshTokenSession.setId(sessionId);
-        refreshTokenSession.setUserId(userId);
-        refreshTokenSession.setTokenHash(tokenHash);
-        refreshTokenSession.setStatus(RefreshTokenStatus.ACTIVE);
-        refreshTokenSession.setExpires(Instant.now().plus(refreshTtl));
+        return new LoginResponse(access, refresh);
+    }
 
-        refreshTokenSessionRepository.save(refreshTokenSession);
+    @Override
+    public LoginResponse register(RegisterRequest req) {
+        String email = Objects.requireNonNull(req.getEmail(), "email").trim().toLowerCase(Locale.ROOT);
+        String password = Objects.requireNonNull(req.getPassword(), "password").trim();
+        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            throw new TokenValidationException("email_invalid");
+        }
+        if (password.length() < 8) {
+            throw new TokenValidationException("password_weak");
+        }
 
-        return new LoginResponse(accessToken, refreshToken);
+        if (getUserByEmailOrNull(email) != null) {
+            throw new TokenValidationException("email_already_exists");
+        }
 
+        UUID userId = UUID.randomUUID();
+        String hash = passwordEncoder.encode(password);
+        String role = "USER";
+        List<String> roles = List.of(role);
+
+        UserCreateRequest create = new UserCreateRequest(
+                userId,
+                req.getFirstName(),
+                req.getLastName(),
+                email,
+                hash,
+                role,
+                true
+        );
+
+        UUID createdId = createUserInUserService(create);
+        if (!createdId.equals(userId)) {
+            userId = createdId;
+        }
+
+        UUID sessionId = UUID.randomUUID();
+        String access = tokenService.generateAccessToken(userId, roles);
+        String refresh = tokenService.generateRefreshToken(userId, sessionId);
+        String tokenHash = hashRefresh(refresh);
+
+        RefreshTokenSession s = new RefreshTokenSession();
+        s.setId(sessionId);
+        s.setUserId(userId);
+        s.setTokenHash(tokenHash);
+        s.setStatus(RefreshTokenStatus.ACTIVE);
+        s.setExpires(Instant.now().plus(refreshTtl));
+        refreshTokenSessionRepository.save(s);
+
+        return new LoginResponse(access, refresh);
+    }
+
+    @Override
+    @Transactional
+    public LoginResponse refreshToken(RefreshRequest oldToken) {
+        ParsedRefresh oldTokenParsed = tokenService.parseRefresh(oldToken.getOldRefreshToken());
+        RefreshTokenSession rts = refreshTokenSessionRepository.findById(oldTokenParsed.getSessionId())
+                .orElseThrow(() -> new TokenValidationException("invalid_sid"));
+
+        if (rts.getExpires().isBefore(Instant.now())) {
+            throw new TokenValidationException("expired_refresh");
+        }
+        if (rts.getStatus() != RefreshTokenStatus.ACTIVE) {
+            throw new TokenValidationException("invalid_refresh");
+        }
+
+        String tokenHash = hashRefresh(oldToken.getOldRefreshToken());
+        if (!tokenHash.equals(rts.getTokenHash())) {
+            throw new TokenValidationException("invalid_refresh_hash");
+        }
+        if (!rts.getUserId().equals(oldTokenParsed.getUserId())) {
+            throw new TokenValidationException("sid_user_mismatch");
+        }
+
+        String url = userServiceUrl + oldTokenParsed.getUserId();
+        UserDto userInfo = restTemplate.getForObject(url, UserDto.class);
+        if (userInfo == null || userInfo.getActive() == null || !userInfo.getActive()) {
+            throw new TokenValidationException("user_inactive");
+        }
+        List<String> roles = List.of(userInfo.getRole());
+
+        int updated = refreshTokenSessionRepository.markActiveAsAlreadyUsed(oldTokenParsed.getSessionId());
+        if (updated != 1) {
+            throw new TokenValidationException("refresh_reuse_detected");
+        }
+
+        UUID newSessionId = UUID.randomUUID();
+        String newRefresh = tokenService.generateRefreshToken(oldTokenParsed.getUserId(), newSessionId);
+        String newHash = hashRefresh(newRefresh);
+
+        RefreshTokenSession newSession = new RefreshTokenSession();
+        newSession.setId(newSessionId);
+        newSession.setUserId(oldTokenParsed.getUserId());
+        newSession.setTokenHash(newHash);
+        newSession.setStatus(RefreshTokenStatus.ACTIVE);
+        newSession.setExpires(Instant.now().plus(refreshTtl));
+        refreshTokenSessionRepository.save(newSession);
+
+        String newAccess = tokenService.generateAccessToken(oldTokenParsed.getUserId(), roles);
+        return new LoginResponse(newAccess, newRefresh);
+    }
+
+    @Override
+    public void logout(RefreshRequest request) {
+        ParsedRefresh oldTokenParsed = tokenService.parseRefresh(request.getOldRefreshToken());
+        RefreshTokenSession rts = refreshTokenSessionRepository.findById(oldTokenParsed.getSessionId())
+                .orElseThrow(() -> new TokenValidationException("invalid_sid"));
+
+        int expire = refreshTokenSessionRepository.expireIfActive(rts.getId());
+        if (expire != 1) {
+            throw new TokenValidationException("logout_reuse_detected");
+        }
+    }
+
+    @Override
+    @Transactional
+    public void logoutAll(LogoutAllRequest request) {
+        refreshTokenSessionRepository.revokeAllActiveByUserId(request.getUserId());
     }
 
     private String hashRefresh(String refreshToken) {
@@ -93,76 +196,28 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    @Override
-    @Transactional
-    public LoginResponse refreshToken(RefreshRequest oldToken) {
-
-        ParsedRefresh oldTokenParsed = tokenService.parseRefresh(oldToken.getOldRefreshToken());
-        RefreshTokenSession rts = refreshTokenSessionRepository.findById(oldTokenParsed.getSessionId())
-                .orElseThrow(() -> new TokenValidationException("invalid_sid"));
-
-        if (rts.getExpires().isBefore(Instant.now())) {
-            throw new TokenValidationException("expired_refresh");
-        }
-
-        if (rts.getStatus() != RefreshTokenStatus.ACTIVE) {
-            throw new TokenValidationException("invalid_refresh");
-        }
-
-        String tokenHash = hashRefresh(oldToken.getOldRefreshToken());
-        if (!tokenHash.equals(rts.getTokenHash())) {
-            throw new TokenValidationException("invalid_refresh_hash");
-        }
-
-        if(rts.getUserId().equals(oldTokenParsed.getUserId())) {
-            throw new TokenValidationException("sid_user_mismatch");
-        }
-
-        String url = userServiceUrl + "/users/" + oldTokenParsed.getUserId();
-        UserInfoResponse userInfo = restTemplate.getForObject(url, UserInfoResponse.class);
-        if (userInfo == null || !userInfo.isActive()) {
-            throw new TokenValidationException("user_inactive");
-        }
-
-        List<String> roles = userInfo.getRoles();
-        int updated = refreshTokenSessionRepository.markActiveAsAlreadyUsed(oldTokenParsed.getSessionId());
-        if(updated != 1) {
-            throw new TokenValidationException("refresh_reuse_detected");
-        }
-
-        UUID newSessionId = UUID.randomUUID();
-        String newRefresh = tokenService.generateRefreshToken(oldTokenParsed.getUserId(), newSessionId);
-        String newHash = hashRefresh(newRefresh);
-
-
-        RefreshTokenSession newSession = new RefreshTokenSession();
-        newSession.setId(newSessionId);
-        newSession.setUserId(oldTokenParsed.getUserId());
-        newSession.setTokenHash(newHash);
-        newSession.setStatus(RefreshTokenStatus.ACTIVE);
-        newSession.setExpires(Instant.now().plus(refreshTtl));
-        refreshTokenSessionRepository.save(newSession);
-
-        String newAccess = tokenService.generateAccessToken(oldTokenParsed.getUserId(), roles);
-
-        return new LoginResponse(newAccess, newRefresh);
-    }
-
-    @Override
-    public void logout(RefreshRequest request) {
-        ParsedRefresh oldTokenParsed = tokenService.parseRefresh(request.getOldRefreshToken());
-        RefreshTokenSession rts = refreshTokenSessionRepository.findById(oldTokenParsed.getSessionId())
-                .orElseThrow(() -> new TokenValidationException("invalid_sid"));
-
-        int expire = refreshTokenSessionRepository.expireIfActive(rts.getId());
-        if(expire != 1) {
-            throw new TokenValidationException("logout_reuse_detected");
+    private UserDto getUserByEmailOrNull(String rawEmail) {
+        String email = rawEmail == null ? null : rawEmail.trim().toLowerCase(Locale.ROOT);
+        String url = userServiceUrl + "by-email?email={email}";
+        try {
+            return restTemplate.getForObject(url, UserDto.class, email);
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+            return null;
         }
     }
 
-    @Override
-    @Transactional
-    public void logoutAll(LogoutAllRequest request) {
-        refreshTokenSessionRepository.revokeAllActiveByUserId(request.getUserId());
+    private UUID createUserInUserService(UserCreateRequest req) {
+        String url = userServiceUrl;
+        try {
+            UserCreateResponse resp = restTemplate.postForObject(url, req, UserCreateResponse.class);
+            if (resp == null || resp.getId() == null) {
+                throw new TokenValidationException("user_create_failed");
+            }
+            return resp.getId();
+        } catch (org.springframework.web.client.HttpClientErrorException.Conflict e) {
+            throw new TokenValidationException("email_already_exists");
+        } catch (HttpClientErrorException e) {
+            throw new TokenValidationException("userservice_unavailable");
+        }
     }
 }

@@ -118,4 +118,9 @@ public class AuthController {
         authService.logoutAll(request);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/register")
+    public LoginResponse register(@Valid @RequestBody RegisterRequest registerRequest) {
+        return authService.register(registerRequest);
+    }
 }
