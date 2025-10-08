@@ -15,10 +15,10 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "first_name") // НЕ unique
+    @Column(name = "first_name")
     private String firstName;
 
-    @Column(name = "last_name") // НЕ unique
+    @Column(name = "last_name")
     private String lastName;
 
     @Column(name = "email", unique = true, nullable = false)

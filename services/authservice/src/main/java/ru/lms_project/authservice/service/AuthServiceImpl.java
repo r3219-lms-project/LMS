@@ -2,18 +2,21 @@ package ru.lms_project.authservice.service;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import ru.lms_project.authservice.dto.*;
 import ru.lms_project.authservice.exceptions.TokenValidationException;
 import ru.lms_project.authservice.model.RefreshTokenSession;
 import ru.lms_project.authservice.model.RefreshTokenStatus;
 import ru.lms_project.authservice.repository.RefreshTokenSessionRepository;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,6 +26,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthServiceImpl implements AuthService {
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
     private final TokenService tokenService;
@@ -78,17 +82,16 @@ public class AuthServiceImpl implements AuthService {
             throw new TokenValidationException("password_weak");
         }
 
+
         if (getUserByEmailOrNull(email) != null) {
-            throw new TokenValidationException("email_already_exists");
+            throw new TokenValidationException(getUserByEmailOrNull(email).toString());
         }
 
-        UUID userId = UUID.randomUUID();
         String hash = passwordEncoder.encode(password);
         String role = "USER";
-        List<String> roles = List.of(role);
 
         UserCreateRequest create = new UserCreateRequest(
-                userId,
+                null,
                 req.getFirstName(),
                 req.getLastName(),
                 email,
@@ -96,20 +99,17 @@ public class AuthServiceImpl implements AuthService {
                 role,
                 true
         );
+        List<String> roles = List.of(role);
 
         UUID createdId = createUserInUserService(create);
-        if (!createdId.equals(userId)) {
-            userId = createdId;
-        }
-
         UUID sessionId = UUID.randomUUID();
-        String access = tokenService.generateAccessToken(userId, roles);
-        String refresh = tokenService.generateRefreshToken(userId, sessionId);
+        String access = tokenService.generateAccessToken(createdId, roles);
+        String refresh = tokenService.generateRefreshToken(createdId, sessionId);
         String tokenHash = hashRefresh(refresh);
 
         RefreshTokenSession s = new RefreshTokenSession();
         s.setId(sessionId);
-        s.setUserId(userId);
+        s.setUserId(createdId);
         s.setTokenHash(tokenHash);
         s.setStatus(RefreshTokenStatus.ACTIVE);
         s.setExpires(Instant.now().plus(refreshTtl));
@@ -140,7 +140,7 @@ public class AuthServiceImpl implements AuthService {
             throw new TokenValidationException("sid_user_mismatch");
         }
 
-        String url = userServiceUrl + oldTokenParsed.getUserId();
+        String url = userServiceUrl + "/" + oldTokenParsed.getUserId();
         UserDto userInfo = restTemplate.getForObject(url, UserDto.class);
         if (userInfo == null || userInfo.getActive() == null || !userInfo.getActive()) {
             throw new TokenValidationException("user_inactive");
@@ -198,26 +198,54 @@ public class AuthServiceImpl implements AuthService {
 
     private UserDto getUserByEmailOrNull(String rawEmail) {
         String email = rawEmail == null ? null : rawEmail.trim().toLowerCase(Locale.ROOT);
-        String url = userServiceUrl + "by-email?email={email}";
+        var uri = byEmailUri(email);
+
         try {
-            return restTemplate.getForObject(url, UserDto.class, email);
+            var resp = restTemplate.getForEntity(uri, UserDto.class);
+
+            if (resp.getStatusCode().value() == 404) return null;
+            if (!resp.getStatusCode().is2xxSuccessful()) {
+                throw new TokenValidationException(resp.toString());
+            }
+
+            var dto = resp.getBody();
+            if (dto == null || dto.getId() == null || dto.getEmail() == null) return null;
+            return dto;
+
         } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
             return null;
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            throw new TokenValidationException(e.getMessage());
         }
     }
 
     private UUID createUserInUserService(UserCreateRequest req) {
-        String url = userServiceUrl;
+        var uri = usersBase();
         try {
-            UserCreateResponse resp = restTemplate.postForObject(url, req, UserCreateResponse.class);
-            if (resp == null || resp.getId() == null) {
+            var resp = restTemplate.postForEntity(uri, req, UserCreateResponse.class);
+            var body = resp.getBody();
+            if (!resp.getStatusCode().is2xxSuccessful() || body == null || body.getId() == null) {
                 throw new TokenValidationException("user_create_failed");
             }
-            return resp.getId();
+            return body.getId();
         } catch (org.springframework.web.client.HttpClientErrorException.Conflict e) {
             throw new TokenValidationException("email_already_exists");
-        } catch (HttpClientErrorException e) {
-            throw new TokenValidationException("userservice_unavailable");
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            throw new TokenValidationException(e.getMessage());
         }
     }
+
+
+    private URI usersBase() {
+        return UriComponentsBuilder.fromHttpUrl(userServiceUrl).build(true).toUri();
+    }
+
+    private URI byEmailUri(String email) {
+        return UriComponentsBuilder.fromHttpUrl(userServiceUrl)
+                .path("/by-email")
+                .queryParam("email", email)
+                .build(true)
+                .toUri();
+    }
+
 }

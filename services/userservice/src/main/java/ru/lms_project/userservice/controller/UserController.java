@@ -37,13 +37,7 @@ public class UserController {
             UserDto user = userService.getByEmail(email);
             return ResponseEntity.ok(user);
         } catch (ResponseStatusException e) {
-            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                Map<String, Object> body = new HashMap<>();
-                body.put("error", "user_not_found");
-                body.put("message", "User with this email does not exist");
-                return ResponseEntity.status(HttpStatus.ACCEPTED).body(body);
-            }
-            throw e;
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "user_not_found");
         }
     }
 
