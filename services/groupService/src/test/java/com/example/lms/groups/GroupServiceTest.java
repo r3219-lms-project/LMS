@@ -1,5 +1,7 @@
 package com.example.lms.groups;
 
+import com.example.lms.groups.client.CourseServiceClient;
+import com.example.lms.groups.client.UserServiceClient;
 import com.example.lms.groups.entity.Group;
 import com.example.lms.groups.repository.GroupRepository;
 import com.example.lms.groups.service.GroupService;
@@ -15,7 +17,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class GroupServiceTest {
 
   private final GroupRepository repository = Mockito.mock(GroupRepository.class);
-  private final GroupService service = new GroupService(repository);
+  private final UserServiceClient userServiceClient = Mockito.mock(UserServiceClient.class);
+  private final CourseServiceClient courseServiceClient = Mockito.mock(CourseServiceClient.class);
+  private final GroupService service = new GroupService(repository, userServiceClient, courseServiceClient);
 
   @Test
   void createGroup_success() {
@@ -26,6 +30,7 @@ class GroupServiceTest {
         .startDate(LocalDate.now())
         .build();
 
+    Mockito.when(courseServiceClient.validateCourse(courseId)).thenReturn(true);
     Mockito.when(repository.save(Mockito.any(Group.class))).thenReturn(saved);
 
     Group result = service.createGroup(courseId, LocalDate.now());
@@ -44,6 +49,7 @@ class GroupServiceTest {
         .startDate(LocalDate.now())
         .build();
 
+    Mockito.when(userServiceClient.validateUser(userId)).thenReturn(true);
     Mockito.when(repository.findById(groupId)).thenReturn(Optional.of(group));
     Mockito.when(repository.save(Mockito.any(Group.class))).thenAnswer(inv -> inv.getArgument(0));
 

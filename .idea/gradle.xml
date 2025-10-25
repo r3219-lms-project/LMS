@@ -9,7 +9,9 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/services" />
+            <option value="$PROJECT_DIR$/services/authservice" />
             <option value="$PROJECT_DIR$/services/courseService" />
+            <option value="$PROJECT_DIR$/services/groupService" />
             <option value="$PROJECT_DIR$/services/shared" />
             <option value="$PROJECT_DIR$/services/userService" />
           </set>

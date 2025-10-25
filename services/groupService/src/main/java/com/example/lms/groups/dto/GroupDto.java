@@ -5,15 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class UserDto {
+public class GroupDto {
   private UUID id;
-  private String username;
-  private String email;
-  private String role;
+  private UUID courseId;
+  private LocalDate startDate;
+  private List<UUID> usersId;
 }
