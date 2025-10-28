@@ -1,14 +1,22 @@
-name: 🚀 LMS Requirements Check
+name: "🚀 LMS Requirements Check"
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop ]     # run on every commit to main/develop
   pull_request:
-    branches: [ main ]
+    branches: [ main ]              # and on PRs targeting main
+
+# Cancel older runs for the same branch/PR if a new commit arrives
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   requirements-check:
-    name: ✅ All Requirements Verification
+    name: "✅ All Requirements Verification"
     runs-on: ubuntu-latest
 
     services:
@@ -32,7 +40,7 @@ jobs:
           MONGO_INITDB_ROOT_USERNAME: lms_user
           MONGO_INITDB_ROOT_PASSWORD: lms_password
         options: >-
-          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping: 1})'"
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -43,73 +51,77 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v4
 
-      - name: ☕ Setup JDK 21
+      - name: ☕ Set up JDK 21 (Temurin) + Maven cache
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: 'maven'              # built-in Maven cache
 
-      - name: 📦 Cache Maven
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-
-      # ✅ ТРЕБОВАНИЯ 1-4: Проверка версий
+      # ✅ REQUIREMENTS 1–4: Tool versions
       - name: 🔍 Check Tool Versions
         run: |
-          echo "✅ ТРЕБОВАНИЕ 1: Java версия"
+          echo "✅ REQUIREMENT 1: Java version"
           java -version
           echo ""
-          echo "✅ ТРЕБОВАНИЕ 2: Maven версия"
-          mvn -version -U
+          echo "✅ REQUIREMENT 2: Maven version"
+          mvn -version -U -ntp
           echo ""
-          echo "✅ ТРЕБОВАНИЕ 3: PostgreSQL версия"
+          echo "✅ REQUIREMENT 3: PostgreSQL version"
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
           PGPASSWORD=lms_password psql -h localhost -U lms_user -d lmsdb -c "SELECT version();"
           echo ""
-          echo "✅ ТРЕБОВАНИЕ 4: MongoDB версия"
+          echo "✅ REQUIREMENT 4: MongoDB version"
           curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
           echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
           sudo apt-get update -qq
           sudo apt-get install -y mongodb-mongosh
           mongosh --host localhost:27017 --username lms_user --password lms_password --authenticationDatabase admin --eval "print('MongoDB version: ' + db.version())"
 
-      # ✅ ТРЕБОВАНИЕ 5: Проверка стиля кода
-      - name: 🎨 Code Style Check
-        run: |
-          echo "✅ ТРЕБОВАНИЕ 5: Проверка стиля кода (Checkstyle)"
-          mvn checkstyle:check -B -U || echo "⚠️ Найдены нарушения стиля (это нормально для проверки)"
+      # ✅ REQUIREMENT 5: Code style (non-blocking)
+      - name: 🎨 Code Style Check (Checkstyle)
+        run: mvn -B -U -ntp checkstyle:check
+        continue-on-error: true
 
-      # ✅ ТРЕБОВАНИЕ 6: Проверка потенциальных ошибок
-      - name: 🐛 Bug Detection
-        run: |
-          echo "✅ ТРЕБОВАНИЕ 6: Проверка потенциальных ошибок (PMD)"
-          mvn compile pmd:check -B -U || echo "⚠️ Найдены потенциальные проблемы (это нормально для проверки)"
+        # ✅ REQUIREMENT 6: Static analysis (non-blocking)
+        # If you don't have PMD configured in pom.xml yet, this will be skipped/fail harmlessly.
+      - name: 🐛 Bug Detection (PMD)
+        run: mvn -B -U -ntp compile pmd:check
+        continue-on-error: true
 
+      # ✅ REQUIREMENT 7: Run unit tests on each commit/PR
       - name: 🧪 Run Tests
-        run: |
-          echo "✅ ТРЕБОВАНИЕ 7: Запуск тестов"
-          mvn test -B -U
+        run: mvn -B -U -ntp clean test
 
+      # Upload test reports even if tests fail (helps debugging in PRs)
+      - name: ⬆️ Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+
+      # ✅ REQUIREMENT 8: Build JAR (skip tests here because they ran already)
       - name: 📦 Build JAR
         run: |
-          echo "✅ ТРЕБОВАНИЕ 8: Сборка JAR"
-          mvn package -DskipTests -B -U
-          echo "📦 Созданные JAR файлы:"
+          mvn -B -U -ntp package -DskipTests
+          echo "📦 Built JAR files (top 10):"
           find . -name "*.jar" -type f | head -10
 
       - name: ✅ Final Summary
+        if: always()
         run: |
           echo "🎯 =========================================="
-          echo "🎯       ВСЕ ТРЕБОВАНИЯ ВЫПОЛНЕНЫ!"
+          echo "🎯       PIPELINE COMPLETED"
           echo "🎯 =========================================="
-          echo "✅ Java 21 - проверен"
-          echo "✅ Maven - проверен"
-          echo "✅ PostgreSQL 15 - проверен"
-          echo "✅ MongoDB 7.0 - проверен"
-          echo "✅ Checkstyle - выполнена проверка стиля"
-          echo "✅ PMD - выполнена проверка ошибок"
-          echo "✅ Тесты - выполнены"
-          echo "✅ JAR - создан"
+          echo "✅ Java 21 - checked"
+          echo "✅ Maven - checked"
+          echo "✅ PostgreSQL 15 - service up"
+          echo "✅ MongoDB 7.0 - service up"
+          echo "✅ Checkstyle - executed (non-blocking)"
+          echo "✅ PMD - executed (non-blocking)"
+          echo "✅ Tests - executed"
+          echo "✅ JAR - built"

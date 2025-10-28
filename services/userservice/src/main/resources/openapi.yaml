@@ -1,0 +1,241 @@
+openapi: 3.0.3
+info:
+  title: UserService API
+  version: "1.0.0"
+  description: |
+    CRUD for users. No auth endpoints here. All timestamps are ISO 8601 (UTC).
+servers:
+  - url: http://localhost:8080
+    description: Local
+
+tags:
+  - name: Users
+    description: Manage users
+
+paths:
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: List users (paginated)
+      operationId: listUsers
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+        - in: query
+          name: q
+          description: Optional case-insensitive search by name or email
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPage' }
+    post:
+      tags: [Users]
+      summary: Create user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserCreateRequest' }
+            examples:
+              sample:
+                value:
+                  email: "jane.doe@example.com"
+                  firstName: "Jane"
+                  lastName: "Doe"
+                  roles: ["STUDENT"]
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDto' }
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by id
+      operationId: getUserById
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDto' }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      tags: [Users]
+      summary: Replace user (full update)
+      operationId: updateUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserUpdateRequest' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDto' }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      tags: [Users]
+      summary: Partially update user
+      operationId: patchUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string, minLength: 1, maxLength: 100 }
+                lastName:  { type: string, minLength: 1, maxLength: 100 }
+                roles:
+                  type: array
+                  items: { $ref: '#/components/schemas/Role' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDto' }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      tags: [Users]
+      summary: Delete user
+      operationId: deleteUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/users/by-email:
+    get:
+      tags: [Users]
+      summary: Get user by email
+      operationId: getUserByEmail
+      parameters:
+        - in: query
+          name: email
+          required: true
+          schema: { type: string, format: email }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDto' }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  schemas:
+    Role:
+      type: string
+      enum: [ADMIN, STUDENT]
+    UserDto:
+      type: object
+      required: [id, email, firstName, lastName, roles, createdAt, updatedAt]
+      properties:
+        id:         { type: string, format: uuid }
+        email:      { type: string, format: email }
+        firstName:  { type: string, minLength: 1, maxLength: 100 }
+        lastName:   { type: string, minLength: 1, maxLength: 100 }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+        createdAt:  { type: string, format: date-time }
+        updatedAt:  { type: string, format: date-time }
+    UserCreateRequest:
+      type: object
+      required: [email, firstName, lastName, roles]
+      properties:
+        email:     { type: string, format: email }
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName:  { type: string, minLength: 1, maxLength: 100 }
+        roles:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Role' }
+    UserUpdateRequest:
+      type: object
+      required: [email, firstName, lastName, roles]
+      properties:
+        email:     { type: string, format: email }
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName:  { type: string, minLength: 1, maxLength: 100 }
+        roles:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Role' }
+    Error:
+      type: object
+      required: [status, error, message, path, timestamp]
+      properties:
+        status:    { type: integer, format: int32, example: 404 }
+        error:     { type: string, example: "Not Found" }
+        message:   { type: string, example: "User not found" }
+        path:      { type: string, example: "/api/v1/users/00000000-0000-0000-0000-000000000000" }
+        timestamp: { type: string, format: date-time }
+    UserPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/UserDto' }
+        page:          { type: integer, example: 0 }
+        size:          { type: integer, example: 20 }
+        totalElements: { type: integer, format: int64, example: 157 }
