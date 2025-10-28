@@ -1,13 +1,11 @@
 package ru.lms_project.authservice.service;
 
 import org.springframework.stereotype.Service;
-import ru.lms_project.authservice.dto.LoginRequest;
-import ru.lms_project.authservice.dto.LoginResponse;
-import ru.lms_project.authservice.dto.LogoutAllRequest;
-import ru.lms_project.authservice.dto.RefreshRequest;
+import ru.lms_project.authservice.dto.*;
 
 @Service
 public interface AuthService {
+    LoginResponse register(RegisterRequest request);
     LoginResponse login(LoginRequest request);
     LoginResponse refreshToken(RefreshRequest refreshToken);
     void logout(RefreshRequest request);
