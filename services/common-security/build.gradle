@@ -2,6 +2,14 @@ plugins {
     id 'java'
 }
 
+bootJar {
+    enabled = false
+}
+
+jar {
+    enabled = true
+}
+
 group = 'org.example'
 version = '1.0-SNAPSHOT'
 
@@ -24,6 +32,9 @@ dependencies {
     // lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    // servlet api
+    compileOnly 'jakarta.servlet:jakarta.servlet-api'
 }
 
 test {
