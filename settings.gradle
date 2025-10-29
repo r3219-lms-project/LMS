@@ -1,3 +1,9 @@
 rootProject.name = 'lms'
-include 'services:courseService', 'services:userService'
-include 'services:shared'
+
+include 'services:courseService'
+include 'services:authservice'
+include 'services:userservice'
+include 'services:common-security'
+
+include 'shared'
+project(':shared').projectDir = file('shared')
