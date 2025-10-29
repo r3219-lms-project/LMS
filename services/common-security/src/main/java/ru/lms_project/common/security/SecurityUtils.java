@@ -10,7 +10,8 @@ import java.util.UUID;
 
 public class SecurityUtils {
 
-    private static boolean isAuthenticated(Authentication authentication) {
+    public static boolean isAuthenticated() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication.getName() == null || !authentication.isAuthenticated() || !(authentication.getPrincipal() instanceof UserPrincipal)) {
             return false;
         }
@@ -18,48 +19,43 @@ public class SecurityUtils {
         return true;
     }
 
-    public static String getCurrentUserId() {
+    public static UUID getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (!isAuthenticated(authentication)) {
+        if (!isAuthenticated()) {
             throw new UnauthorizedException("user_not_authorized");
         }
 
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-        return userPrincipal.getUsername();
+        return userPrincipal.getUserId();
     }
 
-    public static List<GrantedAuthority> getCurrentUserRoles() {
+    public static List<String> getCurrentUserRoles() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (!isAuthenticated(authentication)) {
+        if (!isAuthenticated()) {
             throw new UnauthorizedException("user_not_authorized");
         }
 
-        List<GrantedAuthority> authorities = (List<GrantedAuthority>) authentication.getAuthorities();
-        return authorities;
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        return userPrincipal.getRoles();
     }
 
     public static boolean isAdmin() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAuthenticated(authentication)) {
-            throw new UnauthorizedException("user_not_authorized");
+        if (!isAuthenticated()) {
+            return false;
         }
 
-        List<GrantedAuthority> authorities = (List<GrantedAuthority>) authentication.getAuthorities();
+        List<String> roles = getCurrentUserRoles();
 
-        for (GrantedAuthority grantedAuthority : authorities) {
-            if (grantedAuthority.getAuthority().contains("ADMIN")) {
-                return true;
-            }
-        }
-        return false;
+        return roles.contains("ADMIN");
     }
 
     public static boolean isCurrentUser(UUID userId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (!isAuthenticated(authentication)) {
+        if (!isAuthenticated()) {
             throw new UnauthorizedException("user_not_authorized");
         }
 

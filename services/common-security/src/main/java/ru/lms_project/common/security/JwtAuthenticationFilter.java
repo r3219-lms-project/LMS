@@ -21,33 +21,42 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private JwtTokenProvider jwtTokenProvider;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
+
         String authHeader = request.getHeader("Authorization");
-        String token = null;
 
-        if (authHeader == null) {
-            throw new JwtTokenException("Authorization header is empty");
-        }
-
-        if (authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-        } else {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        String token = authHeader.substring(7);
+
         try {
             ParsedToken parsedToken = jwtTokenProvider.parseAccessToken(token);
+
             UserPrincipal userPrincipal = new UserPrincipal(
                     parsedToken.getUserId(),
                     parsedToken.getRoles()
             );
 
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userPrincipal, null, userPrincipal.getAuthorities());
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userPrincipal,
+                            null,
+                            userPrincipal.getAuthorities()
+                    );
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            filterChain.doFilter(request, response);
-        } catch (JwtTokenException e) {
-            throw new JwtTokenException("invalid_token");
+
+        } catch (Exception e) {
+            System.err.println("JWT validation failed: " + e.getMessage());
         }
+
+        filterChain.doFilter(request, response);
     }
 }

@@ -1,6 +1,7 @@
 package ru.lms_project.common.security;
 
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 @AllArgsConstructor
+@Getter
 public class UserPrincipal implements UserDetails {
     private UUID userId;
     private List<String> roles;
@@ -18,7 +20,10 @@ public class UserPrincipal implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         Collection<GrantedAuthority> authorities = new ArrayList<>();
-        roles.forEach(role -> authorities.add(new SimpleGrantedAuthority(role)));
+        roles.forEach(role -> {
+            String authority = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+            authorities.add(new SimpleGrantedAuthority(authority));
+        });
         return authorities;
     }
 

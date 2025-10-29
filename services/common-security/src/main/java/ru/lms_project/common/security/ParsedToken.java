@@ -11,5 +11,4 @@ import java.util.UUID;
 public class ParsedToken {
     private UUID userId;
     private List<String> roles;
-    private String token;
 }
