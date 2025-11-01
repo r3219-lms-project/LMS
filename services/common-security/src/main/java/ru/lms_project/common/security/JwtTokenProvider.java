@@ -125,6 +125,6 @@ public class JwtTokenProvider {
             throw new TokenValidationException("invalid_roles");
         }
 
-        return new ParsedToken(userId, roles, bearerToken);
+        return new ParsedToken(userId, roles);
     }
 }
