@@ -27,6 +27,21 @@ spring:
                 - Path=/api/v1/courses/**
               filters:
                 - ConditionalAuth
+
+            - id: modulesservice
+              uri: http://localhost:8087
+              predicates:
+                - Path=/api/v1/modules
+              filters:
+                - ConditionalAuth
+
+            - id: lessonsservice
+              uri: http://localhost:8087
+              predicates:
+                - Path=/api/v1/lessons
+              filters:
+                - ConditionalAuth
+
           globalcors:
             cors-configurations:
               '[/**]':
