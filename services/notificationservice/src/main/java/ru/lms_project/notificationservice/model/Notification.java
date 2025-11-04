@@ -1,6 +1,7 @@
 package ru.lms_project.notificationservice.model;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Notification {
     @Id
     private String id;
@@ -25,7 +27,9 @@ public class Notification {
 
     private String message;
 
-    private boolean read;
+    @Builder.Default
+    private boolean read = false;
 
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }
