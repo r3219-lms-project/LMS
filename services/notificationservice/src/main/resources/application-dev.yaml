@@ -1,0 +1,21 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: notificationservice
+
+  data:
+    mongodb:
+      uri: mongodb://admin:admin_password@localhost:27017/lms_mongo_db?authSource=admin
+
+auth:
+  tokens:
+    secret: mysuperlongsecretkey_for_dev_1234567890
+    issuer: http://localhost:8084
+    audience: lms-api
+
+logging:
+  level:
+    ru.lms_project.notificationservice: DEBUG
+    org.springframework.data.mongodb: DEBUG
