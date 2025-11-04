@@ -50,3 +50,12 @@ logging:
   level:
     org.springframework.cloud.gateway: TRACE
     reactor.netty.http.client: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
