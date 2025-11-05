@@ -41,6 +41,17 @@ public class UserController {
         }
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getMe(@RequestHeader("X-User-Id") String userId) {
+        try {
+            UUID id = UUID.fromString(userId);
+            UserDto user = userService.getById(id);
+            return ResponseEntity.ok(user);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "invalid_userid_format");
+        }
+    }
+
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
