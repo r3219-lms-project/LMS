@@ -8,10 +8,8 @@ import ru.lms_project.notificationservice.exceptions.IncorrectDataException;
 import ru.lms_project.notificationservice.model.Notification;
 import ru.lms_project.notificationservice.repository.NotificationRepository;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -53,13 +51,16 @@ public class NotificationService {
     }
 
     public List<NotificationDto> markAllAsRead(UUID userId) {
-        List<Notification> notificationsFromDb = notificationRepository.findAllByUserIdAndReadIsFalseOrderByCreatedAtDesc(userId);
-        notificationsFromDb.stream().forEach(notification -> notification.setRead(true));
-        notificationRepository.saveAll(notificationsFromDb);
-        return notificationsFromDb.stream().map(this::toDTO).toList();
+        List<Notification> notifications = notificationRepository
+                .findAllByUserIdAndReadIsFalseOrderByCreatedAtDesc(userId);
+
+        notifications.forEach(n -> n.setRead(true));
+
+        List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
+        return savedNotifications.stream().map(this::toDTO).toList();
     }
 
-    public NotificationDto deleteNotification(String notificationId, UUID userId) {
+    public void deleteNotification(String notificationId, UUID userId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new IncorrectDataException("Notification not found with id: " + notificationId));
 
@@ -67,7 +68,6 @@ public class NotificationService {
             throw new IncorrectDataException("User does not have permission to delete this notification");
         }
         notificationRepository.delete(notification);
-        return toDTO(notification);
     }
 
     public long getUnreadCount(UUID userId) {
