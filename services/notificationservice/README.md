@@ -78,4 +78,5 @@ gradle :services:notificationservice:bootRun
 ```
 
 Service author: Bykov Lev
+
 Documentation written by: Bykov Lev
