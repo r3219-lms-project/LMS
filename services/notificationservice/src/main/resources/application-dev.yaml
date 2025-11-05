@@ -19,3 +19,8 @@ logging:
   level:
     ru.lms_project.notificationservice: DEBUG
     org.springframework.data.mongodb: DEBUG
+
+springdoc:
+  swagger-ui:
+    url: /openapi.yaml
+

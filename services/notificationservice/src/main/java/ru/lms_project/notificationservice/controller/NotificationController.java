@@ -28,7 +28,7 @@ public class NotificationController {
         return ResponseEntity.ok(notifications);
     }
 
-    @GetMapping("/unread}")
+    @GetMapping("/unread")
     @RequireAuth
     public ResponseEntity<List<NotificationDto>> getUnreadNotifications() {
         UUID userId = SecurityUtils.getCurrentUserId();

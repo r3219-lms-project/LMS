@@ -4,6 +4,7 @@ include 'services:courseService'
 include 'services:authservice'
 include 'services:userservice'
 include 'services:common-security'
+include 'services:notificationservice'
 
 include 'shared'
 project(':shared').projectDir = file('shared')
