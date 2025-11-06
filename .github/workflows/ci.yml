@@ -14,12 +14,10 @@ jobs:
     strategy:
       matrix:
         service:
-          - common-security
-          - authService
-          - courseService
-          - userService
-          - enrollmentService
-          - notificationService
+          - ':services:common-security'
+          - 'services:authservice'
+          - 'services:courseService'
+          - 'services:userservice'
       fail-fast: false
 
     steps:
