@@ -42,6 +42,13 @@ spring:
               filters:
                 - ConditionalAuth
 
+            - id: notificationservice
+              uri: http://localhost:8089
+              predicates:
+                - Path=/api/v1/notifications
+              filters:
+                - Auth
+
           globalcors:
             cors-configurations:
               '[/**]':
