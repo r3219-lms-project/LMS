@@ -10,46 +10,94 @@ jobs:
   build-services:
     name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
-    
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: lms_db
+          POSTGRES_USER: lms_user
+          POSTGRES_PASSWORD: lms_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lms_user -d lms_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mongo:
+        image: mongo:7-jammy
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: admin_password
+          MONGO_INITDB_DATABASE: lms_mongo_db
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "echo 'db.runCommand(\"ping\").ok' | mongosh localhost:27017/lms_mongo_db --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --requirepass redis_password
+          --health-cmd "redis-cli -a redis_password ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     strategy:
       matrix:
         service:
           - 'services:common-security'
           - 'services:authservice'
-          - 'services:courseService'
+          - 'services:course-service'
           - 'services:userservice'
       fail-fast: false
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: 'gradle'
-      
+
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
-      
+
       - name: Build and test ${{ matrix.service }}
-        run: ./gradlew :${{ matrix.service }}:clean :${{ matrix.service }}:build
+        run: ./gradlew :"${{ matrix.service }}":clean :"${{ matrix.service }}":build
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/lms_db
+          SPRING_DATASOURCE_USERNAME: lms_user
+          SPRING_DATASOURCE_PASSWORD: lms_password
+          SPRING_DATA_MONGODB_URI: mongodb://admin:admin_password@localhost:27017/lms_mongo_db?authSource=admin
+          SPRING_REDIS_HOST: localhost
+          SPRING_REDIS_PORT: 6379
+          SPRING_REDIS_PASSWORD: redis_password
 
   build-summary:
     name: Build Summary
     needs: build-services
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
       - name: Check build status
         if: ${{ needs.build-services.result == 'success' }}
-        run: echo "✅ Все сервисы успешно собраны и протестированы!"
-      
+        run: echo "✅ All tests are passed!"
+
       - name: Report failure
         if: ${{ needs.build-services.result != 'success' }}
-        run: | 
-          echo "❌ Ошибка: не удалось собрать один или несколько сервисов."
+        run: |
+          echo "❌ Error. Can't build one or more services"
           exit 1
