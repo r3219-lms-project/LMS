@@ -45,7 +45,7 @@ jobs:
         service:
           - 'services:common-security'
           - 'services:authservice'
-          - 'services:course-service'
+          - 'services:courseService'
           - 'services:userservice'
       fail-fast: false
 
