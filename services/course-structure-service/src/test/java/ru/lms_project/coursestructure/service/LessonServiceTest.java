@@ -155,18 +155,3 @@ class LessonServiceTest {
         verify(lessonRepository, times(1)).deleteById("lesson-1");
     }
 }
-package ru.lms_project.coursestructure;
-
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-
-@SpringBootTest
-@ActiveProfiles("test")
-class CourseStructureServiceApplicationTests {
-
-    @Test
-    void contextLoads() {
-    }
-}
-

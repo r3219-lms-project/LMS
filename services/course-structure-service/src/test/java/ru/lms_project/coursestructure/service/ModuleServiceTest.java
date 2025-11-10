@@ -9,16 +9,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.lms_project.coursestructure.dto.ModuleCreateRequest;
 import ru.lms_project.coursestructure.dto.ModuleDto;
 import ru.lms_project.coursestructure.dto.ModuleUpdateRequest;
+import ru.lms_project.coursestructure.model.Lesson;
 import ru.lms_project.coursestructure.model.Module;
 import ru.lms_project.coursestructure.repository.LessonRepository;
 import ru.lms_project.coursestructure.repository.ModuleRepository;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,7 +57,7 @@ class ModuleServiceTest {
         request.setOrderIndex(1);
 
         when(moduleRepository.save(any(Module.class))).thenReturn(testModule);
-        when(lessonRepository.countByModuleId(anyString())).thenReturn(0L);
+        when(lessonRepository.findByModuleIdOrderByOrderIndexAsc(anyString())).thenReturn(Collections.emptyList());
 
         // Act
         ModuleDto result = moduleService.createModule("course-1", request);
@@ -77,7 +80,7 @@ class ModuleServiceTest {
 
         when(moduleRepository.findByCourseIdOrderByOrderIndexAsc("course-1"))
                 .thenReturn(Arrays.asList(testModule, module2));
-        when(lessonRepository.countByModuleId(anyString())).thenReturn(0L);
+        when(lessonRepository.findByModuleIdOrderByOrderIndexAsc(anyString())).thenReturn(Collections.emptyList());
 
         // Act
         List<ModuleDto> result = moduleService.getModulesByCourseId("course-1");
@@ -93,7 +96,8 @@ class ModuleServiceTest {
     void getModuleById_WhenExists_ShouldReturnModule() {
         // Arrange
         when(moduleRepository.findById("module-1")).thenReturn(Optional.of(testModule));
-        when(lessonRepository.countByModuleId(anyString())).thenReturn(3L);
+        when(lessonRepository.findByModuleIdOrderByOrderIndexAsc("module-1"))
+                .thenReturn(Arrays.asList(new Lesson(), new Lesson(), new Lesson()));
 
         // Act
         ModuleDto result = moduleService.getModuleById("module-1");
@@ -122,7 +126,7 @@ class ModuleServiceTest {
 
         when(moduleRepository.findById("module-1")).thenReturn(Optional.of(testModule));
         when(moduleRepository.save(any(Module.class))).thenReturn(testModule);
-        when(lessonRepository.countByModuleId(anyString())).thenReturn(0L);
+        when(lessonRepository.findByModuleIdOrderByOrderIndexAsc(anyString())).thenReturn(Collections.emptyList());
 
         // Act
         ModuleDto result = moduleService.updateModule("module-1", request);
@@ -136,15 +140,13 @@ class ModuleServiceTest {
     void deleteModule_ShouldDeleteModuleAndLessons() {
         // Arrange
         when(moduleRepository.existsById("module-1")).thenReturn(true);
-        doNothing().when(lessonRepository).deleteByModuleId("module-1");
+        when(lessonRepository.findByModuleIdOrderByOrderIndexAsc("module-1")).thenReturn(Collections.emptyList());
         doNothing().when(moduleRepository).deleteById("module-1");
 
         // Act
         moduleService.deleteModule("module-1");
 
         // Assert
-        verify(lessonRepository, times(1)).deleteByModuleId("module-1");
         verify(moduleRepository, times(1)).deleteById("module-1");
     }
 }
-

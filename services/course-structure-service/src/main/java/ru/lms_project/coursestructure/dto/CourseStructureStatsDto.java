@@ -5,12 +5,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 public class CourseStructureStatsDto {
     private String courseId;
-    private long totalModules;
-    private long totalLessons;
-    private long totalDurationMinutes;
+    private Long totalModules;
+    private Long totalLessons;
+    private Long totalDuration;
 }
-

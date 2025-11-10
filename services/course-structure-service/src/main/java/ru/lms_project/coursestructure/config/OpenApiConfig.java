@@ -6,8 +6,11 @@ import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.tags.Tag;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.Arrays;
 
 @Configuration
 public class OpenApiConfig {
@@ -29,7 +32,11 @@ public class OpenApiConfig {
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
                                         .bearerFormat("JWT")
-                                        .description("JWT token для аутентификации")));
+                                        .description("JWT token для аутентификации")))
+                .tags(Arrays.asList(
+                        new Tag().name("Modules").description("Управление модулями курсов"),
+                        new Tag().name("Lessons").description("Управление уроками модулей"),
+                        new Tag().name("Statistics").description("Статистика по структуре курсов")
+                ));
     }
 }
-

@@ -20,7 +20,6 @@ public class LessonService {
     private final ModuleRepository moduleRepository;
 
     public LessonDto createLesson(String moduleId, LessonCreateRequest request) {
-        // Проверяем существование модуля
         if (!moduleRepository.existsById(moduleId)) {
             throw new RuntimeException("Module not found with id: " + moduleId);
         }
