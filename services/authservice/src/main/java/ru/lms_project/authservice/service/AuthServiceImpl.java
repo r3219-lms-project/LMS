@@ -212,7 +212,7 @@ public class AuthServiceImpl implements AuthService {
             if (dto == null || dto.getId() == null || dto.getEmail() == null) return null;
             return dto;
 
-        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+        } catch (HttpClientErrorException.NotFound e) {
             return null;
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             throw new TokenValidationException(e.getMessage());
@@ -228,7 +228,7 @@ public class AuthServiceImpl implements AuthService {
                 throw new TokenValidationException("user_create_failed");
             }
             return body.getId();
-        } catch (org.springframework.web.client.HttpClientErrorException.Conflict e) {
+        } catch (HttpClientErrorException.Conflict e) {
             throw new TokenValidationException("email_already_exists");
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             throw new TokenValidationException(e.getMessage());

@@ -6,6 +6,8 @@ include 'services:userservice'
 include 'services:progressService'
 include 'services:common-security'
 include 'services:api-gateway'
+include 'services:groupservice'
+include 'services:course-structure-service'
 
 include 'shared'
 project(':shared').projectDir = file('shared')
