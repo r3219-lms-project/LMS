@@ -41,6 +41,12 @@ public class UserController {
         }
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getMe(@RequestHeader("X-User-Id") String userId) {
+        UUID id = UUID.fromString(userId);
+        UserDto user = userService.getById(id);
+        return ResponseEntity.ok(user);
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

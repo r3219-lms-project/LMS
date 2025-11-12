@@ -3,6 +3,7 @@ package ru.lms_project.common.security;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,7 @@ import ru.lms_project.common.security.exceptions.JwtTokenException;
 import java.io.IOException;
 
 @Component
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Autowired
