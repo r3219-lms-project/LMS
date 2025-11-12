@@ -10,66 +10,80 @@ jobs:
   build-services:
     name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
-    
-    # Стратегия "Матрица": запустить это задание параллельно для каждого элемента в списке
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: lms_db
+          POSTGRES_USER: lms_user
+          POSTGRES_PASSWORD: lms_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lms_user -d lms_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mongo:
+        image: mongo:7-jammy
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: admin_password
+          MONGO_INITDB_DATABASE: lms_mongo_db
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "echo 'db.runCommand(\"ping\").ok' | mongosh localhost:27017/lms_mongo_db --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     strategy:
       matrix:
         service:
-          # Сначала собираем общие модули, если они есть
-          - common-security
-          # Затем все остальные сервисы
-          - authService
-          - courseService
-          - userService
-          - enrollmentService
-          - notificationService
-      # Если сборка одного сервиса упадет, остальные продолжат выполняться
+          - 'services:common-security'
+          - 'services:authservice'
+          - 'services:courseService'
+          - 'services:userservice'
       fail-fast: false
 
     steps:
-      # Шаг 1: Клонирование кода из репозитория
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      # Шаг 2: Установка Java (JDK) версии 21
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          # Включаем кеширование зависимостей Gradle. 
-          # Это сильно ускорит последующие сборки, т.к. библиотеки не будут скачиваться заново.
           cache: 'gradle'
-      
-      # Шаг 3: Предоставление прав на выполнение для Gradle Wrapper
-      # Обязательный шаг, без него скрипт gradlew не запустится
+
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
-      
-      # Шаг 4: Сборка и тестирование конкретного сервиса из матрицы
-      # Используем привычную тебе команду clean build
-      - name: Build and test ${{ matrix.service }}
-        run: ./gradlew :${{ matrix.service }}:clean :${{ matrix.service }}:build
 
-  # Итоговое задание, которое подводит итог
+      - name: Build and test ${{ matrix.service }}
+        run: ./gradlew :"${{ matrix.service }}":clean :"${{ matrix.service }}":build
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/lms_db
+          SPRING_DATASOURCE_USERNAME: lms_user
+          SPRING_DATASOURCE_PASSWORD: lms_password
+          SPRING_DATA_MONGODB_URI: mongodb://admin:admin_password@localhost:27017/lms_mongo_db?authSource=admin
+
   build-summary:
     name: Build Summary
-    # Это задание будет ждать завершения всех сборок из матрицы `build-services`
     needs: build-services
     runs-on: ubuntu-latest
-    # `if: always()` означает, что этот шаг выполнится всегда,
-    # даже если какие-то из предыдущих сборок упали.
     if: always()
-    
+
     steps:
-      # Шаг, который проверяет, все ли сборки в матрице были успешными
       - name: Check build status
-        # `needs.build-services.result` содержит итоговый статус всего задания `build-services`
         if: ${{ needs.build-services.result == 'success' }}
-        run: echo "✅ Все сервисы успешно собраны и протестированы!"
-      
-      # Этот шаг выполнится, только если хотя бы одна сборка в матрице провалилась
+        run: echo "✅ All tests are passed!"
+
       - name: Report failure
         if: ${{ needs.build-services.result != 'success' }}
-        # `exit 1` завершает шаг с ошибкой, чтобы весь итоговый пайплайн тоже стал "красным"
-        run: echo "❌ Ошибка: не удалось собрать один или несколько сервисов." && exit 1
+        run: |
+          echo "❌ Error. Can't build one or more services"
+          exit 1
