@@ -1,0 +1,268 @@
+# Gradle
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# IntelliJ IDEA
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# MongoDB data
+data/
+# Course Structure Service
+
+Микросервис для управления структурой курсов (модули и уроки) в LMS с использованием MongoDB.
+
+## Описание
+
+Course Structure Service предоставляет REST API для управления модулями курсов и уроками с интеграцией JWT-аутентификации и авторизации.
+
+## Технологии
+
+- Java 21
+- Spring Boot 3.5.6
+- Spring Data MongoDB
+- Spring Security + JWT
+- Common Security Library
+- Lombok
+- OpenAPI/Swagger UI
+- Embedded MongoDB (для тестов)
+
+## Конфигурация
+
+Сервис использует MongoDB базу данных. Основные настройки находятся в `application.properties`:
+
+- **Порт**: 8087
+- **База данных**: MongoDB (lms_course_structure)
+- **URI**: mongodb://localhost:27017/lms_course_structure
+
+## Модели данных
+
+### Module
+- `id` (String) - Уникальный идентификатор
+- `courseId` (String) - ID курса
+- `title` (String) - Название модуля
+- `description` (String) - Описание модуля
+- `orderIndex` (Integer) - Порядок отображения
+- `createdAt` (LocalDateTime) - Дата создания
+
+### Lesson
+- `id` (String) - Уникальный идентификатор
+- `moduleId` (String) - ID модуля
+- `title` (String) - Название урока
+- `content` (String) - Содержимое урока
+- `type` (LessonType) - Тип урока (VIDEO/TEXT/QUIZ)
+- `duration` (Integer) - Длительность в минутах
+- `orderIndex` (Integer) - Порядок отображения
+- `videoUrl` (String) - URL видео (для VIDEO типа)
+- `createdAt` (LocalDateTime) - Дата создания
+
+## API Endpoints
+
+### Модули
+
+#### Создание модуля (требуется роль ADMIN/TEACHER)
+```http
+POST /api/v1/courses/{courseId}/modules
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "title": "Module 1",
+  "description": "Introduction to the course",
+  "orderIndex": 1
+}
+```
+
+#### Получение модулей курса (публичный)
+```http
+GET /api/v1/courses/{courseId}/modules
+```
+
+#### Получение модуля по ID (публичный)
+```http
+GET /api/v1/modules/{id}
+```
+
+#### Обновление модуля (требуется роль ADMIN/TEACHER)
+```http
+PUT /api/v1/modules/{id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "title": "Updated Module Title",
+  "description": "Updated description",
+  "orderIndex": 2
+}
+```
+
+#### Удаление модуля (требуется роль ADMIN/TEACHER)
+```http
+DELETE /api/v1/modules/{id}
+Authorization: Bearer {token}
+```
+**Примечание**: Каскадное удаление всех уроков модуля
+
+### Уроки
+
+#### Создание урока (требуется роль ADMIN/TEACHER)
+```http
+POST /api/v1/modules/{moduleId}/lessons
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "title": "Lesson 1",
+  "content": "Lesson content here",
+  "type": "VIDEO",
+  "duration": 30,
+  "orderIndex": 1,
+  "videoUrl": "https://example.com/video.mp4"
+}
+```
+
+#### Получение уроков модуля (публичный)
+```http
+GET /api/v1/modules/{moduleId}/lessons
+```
+
+#### Получение урока по ID (публичный)
+```http
+GET /api/v1/lessons/{id}
+```
+
+#### Обновление урока (требуется роль ADMIN/TEACHER)
+```http
+PUT /api/v1/lessons/{id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "title": "Updated Lesson",
+  "duration": 45,
+  "orderIndex": 2
+}
+```
+
+#### Удаление урока (требуется роль ADMIN/TEACHER)
+```http
+DELETE /api/v1/lessons/{id}
+Authorization: Bearer {token}
+```
+
+## Безопасность
+
+Сервис использует JWT токены для аутентификации. Защищенные endpoints требуют:
+- Валидный JWT токен в заголовке `Authorization: Bearer {token}`
+- Роль ADMIN или TEACHER для операций создания, обновления и удаления
+
+Публичные endpoints (GET):
+- Получение списка модулей курса
+- Получение модуля по ID
+- Получение списка уроков модуля
+- Получение урока по ID
+
+## Запуск
+
+### Локально
+
+Убедитесь, что MongoDB запущен:
+```bash
+mongod
+```
+
+Запустите сервис:
+```bash
+./gradlew bootRun
+```
+
+### Сборка
+
+```bash
+./gradlew build
+```
+
+### Запуск тестов
+
+```bash
+./gradlew test
+```
+
+## Swagger UI
+
+После запуска сервиса документация API доступна по адресу:
+```
+http://localhost:8087/swagger-ui.html
+```
+
+## Actuator Endpoints
+
+Проверка состояния сервиса:
+```
+http://localhost:8087/actuator/health
+```
+
+Метрики:
+```
+http://localhost:8087/actuator/metrics
+```
+
+## Особенности
+
+- **Автоматическая сортировка**: Модули и уроки автоматически сортируются по `orderIndex`
+- **Каскадное удаление**: При удалении модуля автоматически удаляются все его уроки
+- **Валидация**: Все входные данные валидируются с использованием Bean Validation
+- **Обработка ошибок**: Глобальный обработчик исключений для унифицированных ответов
+- **MongoDB индексы**: Автоматическое создание индексов для оптимизации запросов
+
+## Профили
+
+- **default**: Локальная разработка
+- **dev**: Разработка с отдельной БД
+- **docker**: Для запуска в Docker контейнере
+- **test**: Для тестирования с embedded MongoDB
+
