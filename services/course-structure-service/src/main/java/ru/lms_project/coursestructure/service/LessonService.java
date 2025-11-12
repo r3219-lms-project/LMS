@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import ru.lms_project.coursestructure.dto.LessonCreateRequest;
 import ru.lms_project.coursestructure.dto.LessonDto;
 import ru.lms_project.coursestructure.dto.LessonUpdateRequest;
+import ru.lms_project.coursestructure.exception.ResourceNotFoundException;
 import ru.lms_project.coursestructure.model.Lesson;
 import ru.lms_project.coursestructure.repository.LessonRepository;
 import ru.lms_project.coursestructure.repository.ModuleRepository;
@@ -21,7 +22,7 @@ public class LessonService {
 
     public LessonDto createLesson(String moduleId, LessonCreateRequest request) {
         if (!moduleRepository.existsById(moduleId)) {
-            throw new RuntimeException("Module not found with id: " + moduleId);
+            throw new ResourceNotFoundException("Module not found with id: " + moduleId);
         }
 
         Lesson lesson = new Lesson();
@@ -46,13 +47,13 @@ public class LessonService {
 
     public LessonDto getLessonById(String id) {
         Lesson lesson = lessonRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Lesson not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + id));
         return toDto(lesson);
     }
 
     public LessonDto updateLesson(String id, LessonUpdateRequest request) {
         Lesson lesson = lessonRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Lesson not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + id));
 
         if (request.getTitle() != null) {
             lesson.setTitle(request.getTitle());
@@ -79,7 +80,7 @@ public class LessonService {
 
     public void deleteLesson(String id) {
         if (!lessonRepository.existsById(id)) {
-            throw new RuntimeException("Lesson not found with id: " + id);
+            throw new ResourceNotFoundException("Lesson not found with id: " + id);
         }
         lessonRepository.deleteById(id);
     }
