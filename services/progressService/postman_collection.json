@@ -1,0 +1,116 @@
+{
+	"info": {
+		"_postman_id": "progress-service-api",
+		"name": "Progress Service API",
+		"description": "API для тестирования микросервиса отслеживания прогресса пользователей",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Complete Lesson",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-User-Id",
+						"value": "{{userId}}",
+						"description": "UUID пользователя"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/progress/lessons/{{lessonId}}/complete?courseId={{courseId}}",
+					"host": ["{{baseUrl}}"],
+					"path": ["progress", "lessons", "{{lessonId}}", "complete"],
+					"query": [
+						{
+							"key": "courseId",
+							"value": "{{courseId}}",
+							"description": "UUID курса"
+						}
+					]
+				}
+			}
+		},
+		{
+			"name": "Get Course Progress",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-User-Id",
+						"value": "{{userId}}",
+						"description": "UUID пользователя"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/progress/courses/{{courseId}}",
+					"host": ["{{baseUrl}}"],
+					"path": ["progress", "courses", "{{courseId}}"]
+				}
+			}
+		},
+		{
+			"name": "Get All My Progress",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-User-Id",
+						"value": "{{userId}}",
+						"description": "UUID пользователя"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/progress/users/me",
+					"host": ["{{baseUrl}}"],
+					"path": ["progress", "users", "me"]
+				}
+			}
+		},
+		{
+			"name": "Get Course Stats",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-User-Id",
+						"value": "{{userId}}",
+						"description": "UUID пользователя"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/progress/courses/{{courseId}}/stats",
+					"host": ["{{baseUrl}}"],
+					"path": ["progress", "courses", "{{courseId}}", "stats"]
+				}
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8088",
+			"description": "Base URL для Progress Service"
+		},
+		{
+			"key": "userId",
+			"value": "123e4567-e89b-12d3-a456-426614174000",
+			"description": "Пример UUID пользователя"
+		},
+		{
+			"key": "courseId",
+			"value": "123e4567-e89b-12d3-a456-426614174001",
+			"description": "Пример UUID курса"
+		},
+		{
+			"key": "lessonId",
+			"value": "123e4567-e89b-12d3-a456-426614174002",
+			"description": "Пример UUID урока"
+		}
+	]
+}
+
