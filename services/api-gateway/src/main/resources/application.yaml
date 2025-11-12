@@ -16,17 +16,22 @@ spring:
               filters:
                 - Auth
 
-            - id: authservice
-              uri: http://localhost:8084
-              predicates:
-                - Path=/api/v1/auth/**
-
             - id: courseservice
               uri: http://localhost:8083
               predicates:
                 - Path=/api/v1/courses/**
               filters:
                 - ConditionalAuth
+
+            - id: authservice
+              uri: http://localhost:8084
+              predicates:
+                - Path=/api/v1/auth/**
+
+            - id: reviewservice
+              uri: http://localhost:8085
+              predicates:
+                - Path=/api/v1/reviews
 
             - id: modulesservice
               uri: http://localhost:8087
@@ -41,6 +46,13 @@ spring:
                 - Path=/api/v1/lessons
               filters:
                 - ConditionalAuth
+
+            - id: progressService
+              uri: http://localhost:8088
+              predicates:
+                - Path=/api/v1/
+              filters:
+                - Auth
 
             - id: notificationservice
               uri: http://localhost:8089
