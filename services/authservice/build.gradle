@@ -4,10 +4,6 @@ plugins {
     id 'io.spring.dependency-management'
 }
 
-group = 'ru.lms_project'
-version = '0.0.1-SNAPSHOT'
-description = 'Authentication service to work with tokens'
-
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -33,8 +29,10 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
 
     // lombok
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+    testCompileOnly 'org.projectlombok:lombok:1.18.34'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
 
     // openapi ui (mvc-версия)
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'

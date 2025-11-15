@@ -1,14 +1,14 @@
 package com.lms.courseService.dto;
 
+import com.lms.courseService.model.CourseLevel;
 import com.lms.courseService.model.CourseStatus;
-
-import java.util.List;
 
 public record CreateCourseResponse(
         String id,
-        String name,
+        String title,
         String description,
-        List<String> students,
+        String thumbnailUrl,
         Integer duration,
+        CourseLevel level,
         CourseStatus status
 ) {}

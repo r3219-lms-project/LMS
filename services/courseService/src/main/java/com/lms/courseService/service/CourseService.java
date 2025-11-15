@@ -4,9 +4,10 @@ import com.lms.courseService.dto.UpdateCourseRequest;
 import com.lms.courseService.model.Course;
 import com.lms.courseService.model.CourseStatus;
 import com.lms.courseService.repository.CourseRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -22,8 +23,12 @@ public class CourseService {
         return repo.save(course);
     }
 
-    public List<Course> getAll() {
-        return repo.findAll();
+    public Page<Course> getAll(Pageable pageable) {
+        return repo.findAll(pageable);
+    }
+
+    public Page<Course> search(String query, Pageable pageable) {
+        return repo.findByTitleContainingIgnoreCase(query, pageable);
     }
 
     public Course getById(String id) {
@@ -50,11 +55,11 @@ public class CourseService {
         if (existingOpt.isEmpty()) return null;
 
         Course existing = existingOpt.get();
-        existing.setName(req.getName());
-        existing.setDescription(req.getDescription());
-        existing.setStudents(req.getStudents());
-        existing.setDuration(req.getDuration());
-        existing.setStatus(req.getStatus());
+        existing.setTitle(req.title());
+        existing.setDescription(req.description());
+        existing.setThumbnailUrl(req.thumbnailUrl());
+        existing.setDuration(req.duration());
+        existing.setLevel(req.level());
         return repo.save(existing);
     }
 }

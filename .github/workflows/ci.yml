@@ -85,7 +85,6 @@ jobs:
         continue-on-error: true
 
         # ✅ REQUIREMENT 6: Static analysis (non-blocking)
-        # If you don't have PMD configured in pom.xml yet, this will be skipped/fail harmlessly.
       - name: 🐛 Bug Detection (PMD)
         run: mvn -B -U -ntp compile pmd:check
         continue-on-error: true

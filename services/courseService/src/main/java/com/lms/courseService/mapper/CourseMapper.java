@@ -3,31 +3,27 @@ package com.lms.courseService.mapper;
 import com.lms.courseService.dto.CreateCourseRequest;
 import com.lms.courseService.dto.CreateCourseResponse;
 import com.lms.courseService.model.Course;
-import com.lms.courseService.model.CourseStatus;
 
-import java.util.ArrayList;
-import java.util.Objects;
-
-public final class CourseMapper {
-    private CourseMapper() {}
+public class CourseMapper {
 
     public static Course toEntity(CreateCourseRequest req) {
-        var c = new Course();
-        c.setName(req.name());
+        Course c = new Course();
+        c.setTitle(req.title());
         c.setDescription(req.description());
-        c.setStudents(req.students() != null ? req.students() : new ArrayList<>());
+        c.setThumbnailUrl(req.thumbnailUrl());
         c.setDuration(req.duration());
-        c.setStatus(Objects.requireNonNullElse(req.status(), CourseStatus.CREATED));
+        c.setLevel(req.level());
         return c;
     }
 
     public static CreateCourseResponse toResponse(Course c) {
         return new CreateCourseResponse(
                 c.getId(),
-                c.getName(),
+                c.getTitle(),
                 c.getDescription(),
-                c.getStudents(),
+                c.getThumbnailUrl(),
                 c.getDuration(),
+                c.getLevel(),
                 c.getStatus()
         );
     }

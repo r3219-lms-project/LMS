@@ -8,8 +8,6 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.List;
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,16 +18,17 @@ public class Course {
     private String id;
 
     @NotBlank
-    private String name;
+    private String title;
 
     private String description;
 
-    // Using string for now cuz no UserService
-    private List<String> students;
+    private String thumbnailUrl;
 
     @NotNull
     private Integer duration;
 
     @NotNull
+    private CourseLevel level;
+
     private CourseStatus status = CourseStatus.CREATED;
 }

@@ -4,9 +4,6 @@ plugins {
     id 'java'
 }
 
-group = 'ru.lms-project'
-version = '0.0.1-SNAPSHOT'
-
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -26,10 +23,10 @@ dependencies {
 
     runtimeOnly 'org.postgresql:postgresql'
 
-    compileOnly 'org.projectlombok:lombok:1.18.32'
-    annotationProcessor 'org.projectlombok:lombok:1.18.32'
-    testCompileOnly 'org.projectlombok:lombok:1.18.32'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+    testCompileOnly 'org.projectlombok:lombok:1.18.34'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
