@@ -1,116 +1,141 @@
-# Auth Service (LMS Project)
+# Auth Service
+**Author of service:** Bykov Lev  
+**Documentation author:** Bykov Lev  
 
-Authentication & token service for the LMS platform.
-Issues **JWT access** and **JWT refresh** tokens, stores refresh *sessions* in DB, and integrates with `userservice` to verify credentials and fetch roles.
 
----
-
-## Table of contents
-
-* [High-level overview](#high-level-overview)
-* [Architecture](#architecture)
-* [JWT model](#jwt-model)
-* [API](#api)
-* [Error model](#error-model)
-* [Persistence model](#persistence-model)
-* [Security](#security)
-* [Configuration](#configuration)
-* [Run & profiles](#run--profiles)
-* [Swagger/OpenAPI](#swaggeropenapi)
-* [Testing](#testing)
-* [Troubleshooting](#troubleshooting)
-* [Future work / nice to have](#future-work--nice-to-have)
-
----
-
-## High-level overview
-
-* **Access token** (short-lived, stateless) is used by resource services to authorize requests.
-* **Refresh token** (longer-lived) is *rotated* on every refresh; the service stores a DB record per refresh *session* and keeps only a **hash** of the refresh JWT.
-* **Login** verifies credentials via `userservice`, creates a refresh session, returns `{access, refresh}`.
-* **Refresh** validates old refresh, *atomically* marks its session as used, creates a new session and returns a new pair.
-* **Logout** expires one session; **LogoutAll** revokes all active sessions for a user.
+# Table of Contents
+- [1. Overview](#1-overview)
+- [2. Responsibilities](#2-responsibilities)
+- [3. Architecture & Components](#3-architecture--components)
+  - [3.1. High-level Architecture](#31-high-level-architecture)
+  - [3.2. Internal Components](#32-internal-components)
+- [4. API](#4-api)
+  - [4.1. POST /login](#41-post-login)
+  - [4.2. POST /refresh](#42-post-refresh)
+  - [4.3. POST /logout](#43-post-logout)
+  - [4.4. POST /logout-all](#44-post-logout-all)
+- [5. Data Models](#5-data-models)
+  - [5.1. JWT Access Token](#51-jwt-access-token)
+  - [5.2. JWT Refresh Token](#52-jwt-refresh-token)
+  - [5.3. Refresh Session Table](#53-refresh-session-table)
+- [6. Security](#6-security)
+- [7. Database](#7-database)
+- [8. Dependencies](#8-dependencies)
+- [9. Error Handling](#9-error-handling)
+- [10. Running the Service](#10-running-the-service)
+  - [10.1. Profiles](#101-profiles)
+  - [10.2. Configuration Properties](#102-configuration-properties)
+- [11. Examples](#11-examples)
 
 ---
 
-## Architecture
+# 1. Overview
 
-```
-[client] → /auth/login → [authservice] → /users/check-credentials (userservice)
-                                     ↘ DB: refresh_token_session
+Auth Service is responsible for **authentication** and **token issuing** in the LMS platform.
+
+It works with two types of tokens:
+
+- **Access token**  
+  Short-lived, stateless, used by resource services for authorization.
+
+- **Refresh token**  
+  Longer-lived, stored only as a **hash** in DB in a **refresh session**.  
+  On each refresh call, the old refresh is **rotated** and marked as used.
+
+Main flows:
+
+- **Login** — check credentials using `userservice`, create refresh session, return `{accessToken, refreshToken}`.
+- **Refresh** — validate old refresh token, mark its session as used, create a new session, return new pair.
+- **Logout** — close one refresh session.
+- **Logout all** — close all active sessions for a user.
+
+Base URL (example):  
+`http://localhost:8084/api/v1/auth`
+
+---
+
+# 2. Responsibilities
+
+Auth Service:
+
+- Validates user credentials via **userservice**.
+- Generates **JWT access** and **JWT refresh** tokens.
+- Stores **refresh sessions** in the database (only **hash** of token).
+- Rotates refresh tokens in a safe way.
+- Expires a single session or all sessions for a user.
+- Validates refresh tokens (claims, audience, issuer, session status, hash).
+- Exposes simple HTTP API for login/refresh/logout.
+
+It does **not** validate access tokens of other services.  
+Resource services must validate access tokens themselves.
+
+---
+
+# 3. Architecture & Components
+
+## 3.1. High-level Architecture
+
+```text
+[client] → /auth/login  → [authservice] → /users/check-credentials (userservice)
+                                       ↘ DB: refresh_token_session
+
 [client] → /auth/refresh → [authservice] (parse + rotate) ↔ DB
 [client] → /auth/logout  → [authservice] (expire one)     ↔ DB
 [client] → /auth/logout-all → [authservice] (revoke all)  ↔ DB
-```
+````
 
-### Services involved
+**Services involved:**
 
-* **authservice** (this repo): issues/rotates tokens, tracks refresh sessions.
-* **userservice** (external dependency):
+* **authservice** (this service):
+  issues and rotates tokens, stores refresh sessions in DB.
 
-    * `POST /users/check-credentials` → `{ userId, roles[], valid }`
-    * `GET  /users/{id}` → `{ id, roles[], active }` (used in refresh to re-check roles/active flag)
+* **userservice** (external):
 
----
-
-## JWT model
-
-### Algorithms & validation
-
-* Library: **jjwt** (io.jsonwebtoken)
-* Signing: **HS256** (HMAC with a shared secret ≥ 32 bytes)
-* Clock skew tolerance: **60s**
-* Mandatory checks: `iss`, `aud`, `sub`, `exp`, `jti`
-* Access-specific: `roles` claim (array or comma-separated string)
-* Refresh-specific: `sid` claim (UUID of refresh session, equals DB `id`)
-
-### Access token (example payload)
-
-```json
-{
-  "iss": "lms-auth",
-  "aud": ["lms-api"],
-  "sub": "7d91b4f5-1a7a-4b71-9b4b-9a1c1b7b4a11",   // userId
-  "iat": 1730400000,
-  "exp": 1730400900,
-  "jti": "f9a1b2c3-d4e5-6789-abcd-ef0123456789",
-  "roles": ["USER","ADMIN"]
-}
-```
-
-### Refresh token (example payload)
-
-```json
-{
-  "iss": "lms-auth",
-  "aud": ["lms-api"],
-  "sub": "7d91b4f5-1a7a-4b71-9b4b-9a1c1b7b4a11",   // userId
-  "iat": 1730400000,
-  "exp": 1731600000,
-  "jti": "1a2b3c4d-5e6f-7890-abcd-ef0123456789",
-  "sid": "c3b5b6c2-7e01-4f9a-9fd5-1e8bca8468a0"    // refresh session id (DB id)
-}
-```
-
-### Claims quick reference
-
-* **Common**: `iss`, `aud`, `iat`, `exp`, `sub`, `jti`
-* **Access-only**: `roles: string[] | string`
-* **Refresh-only**: `sid: string (uuid)`
+  * `POST /users/check-credentials` → `{ userId, roles[], valid }`
+  * `GET /users/{id}` → `{ id, roles[], active }` (used during refresh to re-check user status and roles)
 
 ---
 
-## API
+## 3.2. Internal Components
 
-Base path: `http://localhost:8081/api/v1/auth`
+High-level internal parts (names may vary in code):
 
-> All endpoints below are **permitAll** in `authservice` (no JWT filter here). Resource services will enforce access token checks.
+* **Controllers**
 
-### POST `/login`
+  * `AuthController` — exposes `/login`, `/refresh`, `/logout`, `/logout-all`.
 
-Validate credentials with `userservice`, create a refresh session, return tokens.
+* **Services**
 
-**Request**
+  * `AuthService` / `TokenService` — main logic for issuing and parsing tokens.
+  * `RefreshTokenSessionService` — works with DB table `refresh_token_session`.
+  * `UserClient` or similar — HTTP client for `userservice`.
+
+* **Repositories**
+
+  * `RefreshTokenSessionRepository` — JPA repository for refresh sessions.
+
+* **Config**
+
+  * `SecurityConfig` — stateless security, permit `/api/v1/auth/**` and Swagger.
+  * `AuthProperties` — issuer, audience, TTL for access/refresh, secret key.
+
+---
+
+# 4. API
+
+Base path:
+`/api/v1/auth`
+
+All endpoints are **permitAll** inside Auth Service.
+Resource services will protect their own endpoints using access tokens.
+
+---
+
+## 4.1. POST `/login`
+
+Validate user credentials, create a refresh session, return token pair.
+
+**Request:**
 
 ```json
 {
@@ -119,7 +144,7 @@ Validate credentials with `userservice`, create a refresh session, return tokens
 }
 ```
 
-**Response 200**
+**Response 200:**
 
 ```json
 {
@@ -128,7 +153,7 @@ Validate credentials with `userservice`, create a refresh session, return tokens
 }
 ```
 
-**Errors (401)**
+**Error 401 examples:**
 
 * `invalid_credentials`
 * `user_inactive`
@@ -136,11 +161,19 @@ Validate credentials with `userservice`, create a refresh session, return tokens
 
 ---
 
-### POST `/refresh`
+## 4.2. POST `/refresh`
 
-Rotate refresh token: validate old refresh, mark its session as used (atomic), create a new session and return a new pair.
+Rotate refresh token.
+Steps:
 
-**Request**
+1. Parse old refresh token.
+2. Validate claims (`iss`, `aud`, `sub`, `jti`, `sid`, `exp`).
+3. Check DB session by `sid`.
+4. Mark old session as used (only if status = ACTIVE).
+5. Create new session.
+6. Return new access and refresh tokens.
+
+**Request:**
 
 ```json
 {
@@ -148,7 +181,7 @@ Rotate refresh token: validate old refresh, mark its session as used (atomic), c
 }
 ```
 
-**Response 200**
+**Response 200:**
 
 ```json
 {
@@ -157,7 +190,7 @@ Rotate refresh token: validate old refresh, mark its session as used (atomic), c
 }
 ```
 
-**Errors (401)**
+**Error 401 examples:**
 
 * `invalid_token`, `expired_token`
 * `invalid_audience`, `invalid_subject`, `invalid_jti`, `invalid_expiration`
@@ -168,11 +201,11 @@ Rotate refresh token: validate old refresh, mark its session as used (atomic), c
 
 ---
 
-### POST `/logout`
+## 4.3. POST `/logout`
 
-Expire **one** refresh session.
+Close **one** refresh session (for given refresh token).
 
-**Request**
+**Request:**
 
 ```json
 {
@@ -180,19 +213,22 @@ Expire **one** refresh session.
 }
 ```
 
-**Response**: `204 No Content` (idempotent)
+**Response:**
+`204 No Content`
 
-**Errors (401)**
+The call is safe to repeat: if the session is already closed, nothing breaks.
 
-* `invalid_sid` (if no session for the token's `sid`)
+**Error 401 examples:**
+
+* `invalid_sid` (no session found for `sid`)
 
 ---
 
-### POST `/logout-all`
+## 4.4. POST `/logout-all`
 
-Revoke all **ACTIVE** sessions for a user.
+Close **all active sessions** for a user.
 
-**Request**
+**Request:**
 
 ```json
 {
@@ -200,175 +236,199 @@ Revoke all **ACTIVE** sessions for a user.
 }
 ```
 
-**Response**: `204 No Content`
+**Response:**
+`204 No Content`
 
 ---
 
-### cURL examples
+# 5. Data Models
 
-```bash
-# Login
-curl -X POST http://localhost:8081/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"P@ssw0rd!"}'
+## 5.1. JWT Access Token
 
-# Refresh
-curl -X POST http://localhost:8081/api/v1/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"oldRefreshToken":"<refresh>"}'
+Library: **jjwt** (`io.jsonwebtoken`).
+Algorithm: **HS256** with secret length **≥ 32 bytes**.
+Clock skew tolerance: about **60 seconds**.
 
-# Logout (one session)
-curl -X POST http://localhost:8081/api/v1/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{"oldRefreshToken":"<refresh>"}'
+**Required checks:**
 
-# Logout all
-curl -X POST http://localhost:8081/api/v1/auth/logout-all \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"<userId>"}'
+* `iss`, `aud`, `sub`, `exp`, `jti`
+* `roles` claim (list of roles)
+
+**Example payload:**
+
+```json
+{
+  "iss": "lms-auth",
+  "aud": ["lms-api"],
+  "sub": "7d91b4f5-1a7a-4b71-9b4b-9a1c1b7b4a11",
+  "iat": 1730400000,
+  "exp": 1730400900,
+  "jti": "f9a1b2c3-d4e5-6789-abcd-ef0123456789",
+  "roles": ["USER","ADMIN"]
+}
 ```
 
 ---
 
-## Error model
+## 5.2. JWT Refresh Token
 
-All errors are returned by a global `@RestControllerAdvice` as:
+Refresh token also uses **HS256** and same base claims.
+It adds a `sid` claim — ID of the refresh session in DB.
+
+**Example payload:**
+
+```json
+{
+  "iss": "lms-auth",
+  "aud": ["lms-api"],
+  "sub": "7d91b4f5-1a7a-4b71-9b4b-9a1c1b7b4a11",
+  "iat": 1730400000,
+  "exp": 1731600000,
+  "jti": "1a2b3c4d-5e6f-7890-abcd-ef0123456789",
+  "sid": "c3b5b6c2-7e01-4f9a-9fd5-1e8bca8468a0"
+}
+```
+
+**Claims summary:**
+
+* Common: `iss`, `aud`, `iat`, `exp`, `sub`, `jti`
+* Access-only: `roles`
+* Refresh-only: `sid`
+
+---
+
+## 5.3. Refresh Session Table
+
+Table: `refresh_token_session`
+
+Stores refresh **sessions**, not raw tokens.
+
+| Column       | Type        | Description                                       |
+| ------------ | ----------- | ------------------------------------------------- |
+| `id`         | `uuid` (PK) | equals `sid` in refresh token                     |
+| `user_id`    | `uuid`      | owner of the session                              |
+| `token_hash` | `text`      | Base64(SHA-256(rawRefreshJWT))                    |
+| `status`     | `varchar`   | `ACTIVE` / `ALREADY_USED` / `EXPIRED` / `REVOKED` |
+| `created_at` | `timestamp` | created time (UTC, auditing)                      |
+| `expires_at` | `timestamp` | when session should expire                        |
+
+**Important:** raw refresh token must **never** be stored in DB.
+
+Key repository methods (conceptual):
+
+* `markActiveAsAlreadyUsed(sid)` — set `status=ALREADY_USED` only if `status=ACTIVE`.
+* `expireIfActive(sid)` — set `status=EXPIRED` only if `status=ACTIVE`.
+* `revokeAllActiveByUserId(userId)` — set `status=REVOKED` for all active sessions.
+
+---
+
+# 6. Security
+
+Auth Service:
+
+* Issues access and refresh tokens.
+* Does **not** check access tokens on resource services.
+* Works in **stateless** mode.
+
+Security configuration:
+
+* CSRF disabled.
+* HTTP session is not used.
+* Form login and basic auth are disabled.
+* These paths are allowed for all:
+
+  * `/api/v1/auth/**`
+  * `/v3/api-docs/**`
+  * `/swagger-ui/**`
+  * `/swagger-ui.html`
+
+Resource services should:
+
+* read `Authorization: Bearer <accessToken>` header,
+* parse access token with the same secret and expected `issuer` and `audience`,
+* put user data and roles into security context.
+
+---
+
+# 7. Database
+
+* **Database:** PostgreSQL (for refresh sessions).
+* **Main table:** `refresh_token_session` (described above).
+* In dev you can use `ddl-auto=update`, but in production use migrations (Flyway/Liquibase).
+
+---
+
+# 8. Dependencies
+
+Main libraries (conceptual):
+
+* Spring Boot (Web / WebMVC)
+* Spring Security
+* Spring Data JPA
+* PostgreSQL driver
+* `jjwt` (JWT library)
+* `springdoc-openapi` (for Swagger/OpenAPI UI)
+* H2 (for tests, optional)
+
+---
+
+# 9. Error Handling
+
+Errors are returned in a simple JSON format, for example:
 
 ```json
 {
   "error": "invalid_token",
-  "message": "Optional human-readable details",
+  "message": "Optional human-readable message",
   "timestamp": "2025-10-01T18:25:43Z"
 }
 ```
 
-**401 Unauthorized** for any token/session/auth related problem:
+**HTTP 401 Unauthorized** — any token/session/authentication problem:
 
-* `invalid_token`, `expired_token`, `invalid_audience`, `invalid_subject`,
-  `invalid_jti`, `invalid_expiration`
-* `invalid_sid`, `sid_user_mismatch`, `invalid_status`, `refresh_reuse_detected`
+* `invalid_token`, `expired_token`
+* `invalid_audience`, `invalid_subject`, `invalid_jti`, `invalid_expiration`
+* `invalid_sid`, `sid_user_mismatch`
+* `invalid_status`, `refresh_reuse_detected`
 * `invalid_refresh_hash`, `expired_refresh`
 * `invalid_credentials`, `bad_credentials`, `user_inactive`, `logout_reuse_detected`
 
-**400 Bad Request** for validation errors (if DTO validation is enabled).
+**HTTP 400 Bad Request** — validation errors for request DTOs.
 
-**500 Internal Server Error** for unexpected failures.
-
----
-
-## Persistence model
-
-### Table: `refresh_token_session`
-
-Tracks refresh sessions. Only **hash** of the refresh token is stored.
-
-| Column       | Type        | Notes                                               |
-| ------------ | ----------- | --------------------------------------------------- |
-| `id`         | `uuid` (PK) | **sid**; also embedded in refresh JWT (`sid` claim) |
-| `user_id`    | `uuid`      | user owner                                          |
-| `token_hash` | `text`      | Base64(SHA-256(rawRefreshJWT))                      |
-| `status`     | `varchar`   | `ACTIVE` / `ALREADY_USED` / `EXPIRED` / `REVOKED`   |
-| `created_at` | `timestamp` | set by `@CreatedDate` (auditing)                    |
-| `expires_at` | `timestamp` | session expiry (should match refresh TTL)           |
-
-> **DO NOT** store raw refresh JWT.
-
-### Repository methods (key ones)
-
-* `int markActiveAsAlreadyUsed(UUID sid)` — atomic rotation guard
-  Updates `status=ALREADY_USED` **only if** current status is `ACTIVE`.
-  Returns `1` on success, `0` if someone already rotated.
-* `int expireIfActive(UUID sid)` — idempotent logout of one session.
-  Updates `status=EXPIRED` **only if** current is `ACTIVE`.
-* `void revokeAllActiveByUserId(UUID userId)` — logout all devices.
+**HTTP 500 Internal Server Error** — unexpected errors.
 
 ---
 
-## Security
+# 10. Running the Service
 
-`authservice` itself **does not** validate access tokens (it issues them).
-Resource services must implement JWT validation (parse access, put Authentication in context).
+Typical commands (Gradle):
 
-Authservice SecurityConfig:
-
-* Stateless: `SessionCreationPolicy.STATELESS`
-* CSRF disabled, form/basic login disabled
-* Permit Swagger & `/api/v1/auth/**`
-* (Optionally) add CORS when frontend is ready
-
-Permit list:
-
-```
-/api/v1/auth/**
-/v3/api-docs/**
-/swagger-ui/**
-/swagger-ui.html
+```bash
+./gradlew clean build
+./gradlew bootRun
 ```
 
----
-
-## Configuration
-
-### Required properties (typical `application.yaml`)
+Service port example:
 
 ```yaml
 server:
   port: 8084
-
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/lms_auth
-    username: postgres
-    password: postgres
-  jpa:
-    hibernate:
-      ddl-auto: update         # dev only; use migrations in prod
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
-  jackson:
-    time-zone: UTC
-
-auth:
-  userservice:
-    base-url: http://localhost:8082        # change to your userservice host
-  tokens:
-    issuer: lms-auth
-    audience: lms-api
-    access:
-      ttl: PT15M                            # ISO-8601 duration (15 minutes)
-    refresh:
-      ttl: P14D                             # 14 days
-    # secret must be >= 32 bytes raw OR base64-encoded
-    secret: "change-me-please-32bytes-min-or-base64"
 ```
-
-### Important notes
-
-* **Secret**: must be at least **32 bytes** (256 bits) raw or Base64-encoded. If you provide Base64, service decodes it automatically; else uses raw UTF-8 bytes.
-* **Clock**: server uses UTC (`Instant`) for timestamps.
-* **TTL parity**: `auth.tokens.refresh.ttl` must match DB `expires_at` you set when creating sessions.
 
 ---
 
-## Run & profiles
+## 10.1. Profiles
 
-### Dev (Postgres local)
+* **Dev profile**
 
-1. Start docker-compose from infrastructure/.
-2. Set properties as above (or via env vars).
-3. Run:
+  * Uses PostgreSQL.
+  * `ddl-auto=update` (for local development).
+* **Test profile**
 
-   ```bash
-   ./gradlew bootRun
-   ```
-4. Base URL: `http://localhost:8081`
+  * Uses in-memory H2 DB.
+  * `ddl-auto=create-drop`.
 
-### Test profile (H2)
-
-Use H2 in-memory for tests:
-`src/test/resources/application-test.properties`:
+Example test properties:
 
 ```properties
 spring.datasource.url=jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
@@ -377,426 +437,11 @@ spring.jpa.hibernate.ddl-auto=create-drop
 spring.jpa.show-sql=false
 ```
 
-Activate with `@ActiveProfiles("test")` in tests (or Gradle env).
-
 ---
 
-## Swagger/OpenAPI
+## 10.2. Configuration Properties
 
-Dependency (Gradle):
-
-```gradle
-implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
-```
-
-* UI: `http://localhost:8081/swagger-ui/index.html`
-* Docs: `http://localhost:8081/v3/api-docs`
-
-OpenAPI config registers a **Bearer** scheme, so resource services can later authorize with access tokens inside the UI.
-
----
-
-## Testing
-
-### Run all tests
-
-```bash
-./gradlew test
-```
-
-### What is covered
-
-* **Unit**: `TokenServiceTest`
-
-    * generate/parse access & refresh (positive)
-    * (add) negative cases: invalid audience, expired, missing roles, wrong signature, refresh-as-access, access-as-refresh
-* **Repository**: `RefreshTokenSessionRepositoryTest`
-
-    * atomic rotation: first update=1, second=0
-    * (add) `expireIfActive` idempotency
-* **Web / Controller**:
-
-    * Either `@SpringBootTest(webEnvironment = MOCK)` + `@AutoConfigureMockMvc`
-    * Or (faster) `@WebMvcTest(AuthController.class)` with:
-
-        * `@MockitoBean AuthService`
-        * exclude SecurityConfig & JPA autoconfig if needed
-
-### Common pitfalls
-
-* `@WebMvcTest` must point to the **controller**, not the test class.
-* If MVC slice accidentally loads Security/JPA, exclude with:
-
-    * `excludeFilters = @Filter(ASSIGNABLE_TYPE, classes = SecurityConfig.class)`
-    * `@ImportAutoConfiguration(exclude = { DataSourceAutoConfiguration, HibernateJpaAutoConfiguration, JpaRepositoriesAutoConfiguration })`
-* For integration tests, prefer `@SpringBootTest + H2` and mock `userservice` via `MockRestServiceServer`.
-
----
-
-## Troubleshooting
-
-* **`invalid_audience`** during parse: ensure `auth.tokens.audience` matches what you set into tokens and what services expect.
-* **`secret length less than 32 bytes`**: set a stronger secret (≥ 32 bytes raw or Base64 43+ chars).
-* **Refresh reuse accepted**: ensure repository method `markActiveAsAlreadyUsed` is used (not simple `save()`), and check it returns `1`.
-* **401 in Swagger** (within authservice): ensure `SecurityConfig` has `permitAll` for `/api/v1/auth/**` and Swagger endpoints.
-* **DB stores raw refresh**: it must store **SHA-256(Base64)** *hash* only (never raw JWT).
-
----
-
-## Future work / nice to have
-
-* Add **CORS** once frontend is ready (allow dev origins).
-* Add **rate limiting** for `/login`.
-* Add **pepper** for refresh hash (env secret concatenated before SHA-256).
-* Add **session metadata** (ip, userAgent) for admin UI.
-* Resource services: implement **JwtAuthFilter** to verify access tokens and put `Authentication` with roles → enable `@PreAuthorize`.
-* Migrations (Flyway/Liquibase) instead of `ddl-auto`.
-* More comprehensive negative tests.
-
----
-
-## Appendix — Userservice contracts (assumed)
-
-* `POST /users/check-credentials`
-
-  ```json
-  // Request:
-  { "email": "user@example.com", "password": "P@ssw0rd!" }
-
-  // Response 200:
-  { "userId": "<uuid>", "roles": ["USER","ADMIN"], "valid": true }
-
-  // Response 401:
-  { "error": "invalid_credentials" }
-  ```
-* `GET /users/{id}`
-
-  ```json
-  // Response 200:
-  { "id": "<uuid>", "roles": ["USER","ADMIN"], "active": true }
-  ```
-
----
-
-**Owner:** LMS Team
-**Service:** `authservice`
-**Default port:** `8088`
-**Contact:** drop issues in the repository
---------------------------------------------------------------
-# Auth Service (LMS Project)
-
-Сервис аутентификации и выдачи токенов для платформы LMS.
-Выдаёт **JWT access** и **JWT refresh** токены, хранит **сессии refresh** в БД (только хэш токена), интегрируется с `userservice` для проверки логина/пароля и получения ролей.
-
----
-
-## Содержание
-
-* [Общее описание](#общее-описание)
-* [Архитектура](#архитектура)
-* [Модель JWT](#модель-jwt)
-* [API](#api)
-* [Модель ошибок](#модель-ошибок)
-* [Модель данных](#модель-данных)
-* [Безопасность](#безопасность)
-* [Конфигурация](#конфигурация)
-* [Запуск и профили](#запуск-и-профили)
-* [Swagger / OpenAPI](#swagger--openapi)
-* [Тестирование](#тестирование)
-* [Разбор проблем](#разбор-проблем)
-* [Планы на будущее](#планы-на-будущее)
-* [Приложение — контракты userservice](#приложение--контракты-userservice)
-
----
-
-## Общее описание
-
-* **Access-токен** (короткоживущий, stateless) — проверяется ресурс-сервисами.
-* **Refresh-токен** (длинный) — **ротируется** при каждом обновлении, в БД хранится запись о сессии (только **хэш** refresh JWT).
-* **/login** — проверяет креды через `userservice`, создаёт refresh-сессию, возвращает пару `{access, refresh}`.
-* **/refresh** — валидирует старый refresh, **атомарно** помечает его как использованный, создаёт новую сессию, возвращает новую пару.
-* **/logout** — завершает одну refresh-сессию; **/logout-all** — отзывает все активные сессии пользователя.
-
----
-
-## Архитектура
-
-```
-[client] → /auth/login  → [authservice] → /users/check-credentials (userservice)
-                                       ↘ БД: refresh_token_session
-[client] → /auth/refresh → [authservice] (parse + rotate) ↔ БД
-[client] → /auth/logout  → [authservice] (expire one)     ↔ БД
-[client] → /auth/logout-all → [authservice] (revoke all)  ↔ БД
-```
-
-### Сервисы
-
-* **authservice** (этот репозиторий): выдаёт/ротирует токены, ведёт учёт сессий refresh.
-* **userservice** (внешний сервис):
-
-    * `POST /users/check-credentials` → `{ userId, roles[], valid }`
-    * `GET  /users/{id}` → `{ id, roles[], active }` (пере-проверка в `/refresh`)
-
----
-
-## Модель JWT
-
-### Алгоритм и проверки
-
-* Библиотека: **jjwt** (io.jsonwebtoken)
-* Подпись: **HS256** (секрет ≥ 32 байт)
-* Допуск рассинхрона часов: **60s**
-* Обязательные проверки: `iss`, `aud`, `sub`, `exp`, `jti`
-* Для access: обязательный `roles` (массив строк или CSV-строка)
-* Для refresh: обязательный `sid` (UUID сессии, равен `id` в БД)
-
-### Пример payload access-токена
-
-```json
-{
-  "iss": "lms-auth",
-  "aud": ["lms-api"],
-  "sub": "7d91b4f5-1a7a-4b71-9b4b-9a1c1b7b4a11",   // userId
-  "iat": 1730400000,
-  "exp": 1730400900,
-  "jti": "f9a1b2c3-d4e5-6789-abcd-ef0123456789",
-  "roles": ["USER","ADMIN"]
-}
-```
-
-### Пример payload refresh-токена
-
-```json
-{
-  "iss": "lms-auth",
-  "aud": ["lms-api"],
-  "sub": "7d91b4f5-1a7a-4b71-9b4b-9a1c1b7b4a11",   // userId
-  "iat": 1730400000,
-  "exp": 1731600000,
-  "jti": "1a2b3c4d-5e6f-7890-abcd-ef0123456789",
-  "sid": "c3b5b6c2-7e01-4f9a-9fd5-1e8bca8468a0"    // id сессии refresh в БД
-}
-```
-
-### Клеймы кратко
-
-* **Общие:** `iss`, `aud`, `iat`, `exp`, `sub`, `jti`
-* **Только access:** `roles: string[] | string`
-* **Только refresh:** `sid: string (uuid)`
-
----
-
-## API
-
-База: `http://localhost:8084/api/v1/auth`
-
-> В самом **authservice** все эндпоинты `/auth/**` открыты (permitAll).
-> Проверку access-токена делают **ресурс-сервисы** через свой JWT-фильтр.
-
-### POST `/login`
-
-Проверка кредов в `userservice`, создание refresh-сессии, выдача пары токенов.
-
-**Запрос**
-
-```json
-{
-  "email": "user@example.com",
-  "password": "P@ssw0rd!"
-}
-```
-
-**Ответ 200**
-
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
-}
-```
-
-**Ошибки (401)**
-
-* `invalid_credentials`
-* `user_inactive`
-* `user_service_empty_response`
-
----
-
-### POST `/refresh`
-
-Ротация refresh-токена: валидация старого, атомарная пометка как использованного, создание новой сессии и выдача новой пары.
-
-**Запрос**
-
-```json
-{
-  "oldRefreshToken": "eyJhbGciOiJIUzI1NiIs..."
-}
-```
-
-**Ответ 200**
-
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIs...new...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs...new..."
-}
-```
-
-**Ошибки (401)**
-
-* `invalid_token`, `expired_token`
-* `invalid_audience`, `invalid_subject`, `invalid_jti`, `invalid_expiration`
-* `invalid_sid`, `sid_user_mismatch`
-* `invalid_status`, `refresh_reuse_detected`
-* `invalid_refresh_hash`
-* `user_inactive`
-
----
-
-### POST `/logout`
-
-Завершение **одной** refresh-сессии (идемпотентно).
-
-**Запрос**
-
-```json
-{
-  "oldRefreshToken": "eyJhbGciOiJIUzI1NiIs..."
-}
-```
-
-**Ответ**: `204 No Content`
-
-**Ошибки (401)**
-
-* `invalid_sid` (если по `sid` сессия не найдена)
-
----
-
-### POST `/logout-all`
-
-Отзыв **всех ACTIVE** сессий пользователя.
-
-**Запрос**
-
-```json
-{
-  "userId": "7d91b4f5-1a7a-4b71-9b4b-9a1c1b7b4a11"
-}
-```
-
-**Ответ**: `204 No Content`
-
----
-
-### Примеры cURL
-
-```bash
-# Login
-curl -X POST http://localhost:8081/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"P@ssw0rd!"}'
-
-# Refresh
-curl -X POST http://localhost:8081/api/v1/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"oldRefreshToken":"<refresh>"}'
-
-# Logout (одна сессия)
-curl -X POST http://localhost:8081/api/v1/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{"oldRefreshToken":"<refresh>"}'
-
-# Logout all
-curl -X POST http://localhost:8081/api/v1/auth/logout-all \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"<userId>"}'
-```
-
----
-
-## Модель ошибок
-
-Глобальный `@RestControllerAdvice` возвращает ошибки в формате:
-
-```json
-{
-  "error": "invalid_token",
-  "message": "Опционально: человекочитаемая детализация",
-  "timestamp": "2025-10-01T18:25:43Z"
-}
-```
-
-**401 Unauthorized** — всё, что связано с токенами/сессиями/аутентификацией:
-
-* `invalid_token`, `expired_token`, `invalid_audience`, `invalid_subject`,
-  `invalid_jti`, `invalid_expiration`
-* `invalid_sid`, `sid_user_mismatch`, `invalid_status`, `refresh_reuse_detected`
-* `invalid_refresh_hash`, `expired_refresh`
-* `invalid_credentials`, `bad_credentials`, `user_inactive`, `logout_reuse_detected`
-
-**400 Bad Request** — ошибки валидации входных DTO (если включишь `@Valid`).
-
-**500 Internal Server Error** — неожиданные ошибки.
-
----
-
-## Модель данных
-
-### Таблица: `refresh_token_session`
-
-Учёт refresh-сессий. Хранится **только хэш** refresh-токена.
-
-| Колонка      | Тип         | Примечание                                         |
-| ------------ | ----------- | -------------------------------------------------- |
-| `id`         | `uuid` (PK) | **sid**; так же лежит в refresh JWT (`sid` claim)  |
-| `user_id`    | `uuid`      | пользователь-владелец                              |
-| `token_hash` | `text`      | Base64(SHA-256(rawRefreshJWT))                     |
-| `status`     | `varchar`   | `ACTIVE` / `ALREADY_USED` / `EXPIRED` / `REVOKED`  |
-| `created_at` | `timestamp` | `@CreatedDate` (auditing)                          |
-| `expires_at` | `timestamp` | время истечения сессии (соответствует refresh TTL) |
-
-> Никогда не храни «сырой» refresh JWT — только хэш.
-
-### Ключевые методы репозитория
-
-* `int markActiveAsAlreadyUsed(UUID sid)` — защита ротации
-  Обновляет `status=ALREADY_USED` **только если** текущий статус `ACTIVE`.
-  Возвращает `1`, если обновлена одна строка; `0`, если кто-то уже успел.
-* `int expireIfActive(UUID sid)` — идемпотентный logout одной сессии.
-  Обновляет `status=EXPIRED` **только если** текущий статус `ACTIVE`.
-* `void revokeAllActiveByUserId(UUID userId)` — отзыв всех активных сессий.
-
----
-
-## Безопасность
-
-Сам **authservice** **не** проверяет access-токены (он их **выдаёт**).
-Проверку access выполняют **ресурс-сервисы** (через свой `OncePerRequestFilter`: читать `Authorization: Bearer ...`, `TokenService.parseAccess(...)`, класть `Authentication` с ролями).
-
-SecurityConfig в authservice:
-
-* Stateless: `SessionCreationPolicy.STATELESS`
-* CSRF выключен, form/basic выключены
-* Swagger и `/api/v1/auth/**` — `permitAll`
-* (Позже) добавить CORS для фронта
-
-Разрешённые пути:
-
-```
-/api/v1/auth/**
-/v3/api-docs/**
-/swagger-ui/**
-/swagger-ui.html
-```
-
----
-
-## Конфигурация
-
-### Основные свойства (`application.yml`)
+Example `application.yml`:
 
 ```yaml
 server:
@@ -809,7 +454,7 @@ spring:
     password: postgres
   jpa:
     hibernate:
-      ddl-auto: update          # только для dev; в prod использовать миграции
+      ddl-auto: update     # dev only
     properties:
       hibernate:
         jdbc:
@@ -824,146 +469,52 @@ auth:
     issuer: lms-auth
     audience: lms-api
     access:
-      ttl: PT15M                # ISO-8601 (15 минут)
+      ttl: PT15M           # 15 minutes
     refresh:
-      ttl: P14D                 # 14 дней
-    # секрет должен быть ≥ 32 байт сырых или Base64 (декодируется автоматически)
+      ttl: P14D            # 14 days
     secret: "change-me-please-32bytes-min-or-base64"
 ```
 
-### Важные замечания
+Notes:
 
-* **Secret**: минимум **32 байта** (256 бит) — сырые UTF-8 байты или Base64.
-* **Время**: `Instant`/UTC.
-* **TTL**: `auth.tokens.refresh.ttl` должен соответствовать `expires_at`, которое выставляете при создании записи в БД.
-
----
-
-## Запуск и профили
-
-### Dev (локальный Postgres)
-
-1. Запусти docker-compose из infrastructure/.
-2. Заполни свойства (или ENV-переменные).
-3. Запуск:
-
-   ```bash
-   ./gradlew bootRun
-   ```
-4. База URL: `http://localhost:8081`
-
-### Test (H2)
-
-`src/test/resources/application-test.properties`:
-
-```properties
-spring.datasource.url=jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
-spring.datasource.driver-class-name=org.h2.Driver
-spring.jpa.hibernate.ddl-auto=create-drop
-spring.jpa.show-sql=false
-```
-
-Активируй `@ActiveProfiles("test")` в тестах (или через Gradle ENV).
+* `secret` must be at least **32 bytes** (raw) or a strong Base64 string.
+* All time handling is in **UTC**.
+* `refresh.ttl` should match how you set `expires_at` in DB.
 
 ---
 
-## Swagger / OpenAPI
+# 11. Examples
 
-Зависимость (Gradle):
-
-```gradle
-implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
-```
-
-* UI: `http://localhost:8081/swagger-ui/index.html`
-* JSON: `http://localhost:8081/v3/api-docs`
-
-В конфиге OpenAPI объявлена схема **Bearer** — пригодится, когда ресурс-сервисы начнут авторизовываться access-токеном в Swagger UI.
-
----
-
-## Тестирование
-
-### Запуск тестов
+### Login
 
 ```bash
-./gradlew test
+curl -X POST http://localhost:8084/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"P@ssw0rd!"}'
 ```
 
-### Что покрыто (и что стоит добавить)
+### Refresh
 
-* **Unit (TokenServiceTest)**
-  ✔ позитив: generate/parse access и refresh
-  ➕ негатив: `invalid_audience`, `expired_token`, `missing_roles`, `wrong_signature`, «refresh как access» и наоборот
+```bash
+curl -X POST http://localhost:8084/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"oldRefreshToken":"<refresh>"}'
+```
 
-* **Repository (RefreshTokenSessionRepositoryTest)**
-  ✔ двойной апдейт ротации: первый раз `1`, второй раз `0`
-  ➕ тест на `expireIfActive` (второй вызов `0`)
+### Logout (one session)
 
-* **Web / Controller**
-  ✔ сейчас — через `@SpringBootTest(webEnvironment = MOCK) + @AutoConfigureMockMvc`
-  ➕ ускоренный вариант через `@WebMvcTest(AuthController.class)` с:
+```bash
+curl -X POST http://localhost:8084/api/v1/auth/logout \
+  -H "Content-Type: application/json" \
+  -d '{"oldRefreshToken":"<refresh>"}'
+```
 
-    * `@MockitoBean AuthService`
-    * исключение `SecurityConfig` и JPA автоконфигов при необходимости
+### Logout all sessions
 
-### Частые ошибки
-
-* `@WebMvcTest` должен указывать на **контроллер**, а не на класс теста.
-* Если MVC-слайс случайно подхватывает Security/JPA — исключай:
-
-    * `excludeFilters = @Filter(ASSIGNABLE_TYPE, classes = SecurityConfig.class)`
-    * `@ImportAutoConfiguration(exclude = { DataSourceAutoConfiguration, HibernateJpaAutoConfiguration, JpaRepositoriesAutoConfiguration })`
-
----
-
-## Разбор проблем
-
-* **`invalid_audience` при парсинге** — проверь `auth.tokens.audience` в конфиге и в токенах.
-* **`secret length less than 32 bytes`** — увеличь секрет (≥ 32 байт сырых или Base64).
-* **Рефреш «переиспользуется»** — используй `markActiveAsAlreadyUsed(sid)` и проверяй, что вернулось `1`.
-* **401 в Swagger (внутри authservice)** — в `SecurityConfig` должны быть `permitAll` на `/api/v1/auth/**` и Swagger пути.
-* **В БД лежит сырой refresh** — это нарушение: должен лежать **только хэш** (Base64(SHA-256)).
+```bash
+curl -X POST http://localhost:8084/api/v1/auth/logout-all \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"<userId>"}'
+```
 
 ---
-
-## Планы на будущее
-
-* Включить **CORS** для фронта (когда появится): `http://localhost:3000`, `http://localhost:5173`.
-* **Rate limiting** на `/login`.
-* **Pepper** для хэша refresh (секрет из ENV, добавляем перед SHA-256).
-* **Метаданные сессии**: IP, userAgent — удобно для админки/аналитики.
-* В ресурс-сервисах — **JwtAuthFilter**: читать `Authorization`, парсить access, класть `Authentication` с ролями → `@PreAuthorize` заработает.
-* Миграции схемы (Flyway/Liquibase) вместо `ddl-auto`.
-* Больше негативных тестов.
-
----
-
-## Приложение — контракты userservice
-
-* `POST /users/check-credentials`
-
-  ```json
-  // Request:
-  { "email": "user@example.com", "password": "P@ssw0rd!" }
-
-  // Response 200:
-  { "userId": "<uuid>", "roles": ["USER","ADMIN"], "valid": true }
-
-  // Response 401:
-  { "error": "invalid_credentials" }
-  ```
-
-* `GET /users/{id}`
-
-  ```json
-  // Response 200:
-  { "id": "<uuid>", "roles": ["USER","ADMIN"], "active": true }
-  ```
-
----
-
-**Владелец:** LMS Team
-**Сервис:** `authservice`
-**Порт по умолчанию:** `8084`
-**Вопросы/багрепорты:** создавайте issue в репозитории
