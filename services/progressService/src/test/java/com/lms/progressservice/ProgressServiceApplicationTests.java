@@ -1,13 +1,14 @@
-package com.lms.progressService;
+package com.lms.progressservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
+@ActiveProfiles("test")
 class ProgressServiceApplicationTests {
 
     @Test
     void contextLoads() {
-        // Проверяем, что Spring контекст загружается без ошибок
     }
 }

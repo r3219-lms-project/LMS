@@ -1,0 +1,36 @@
+server:
+  port: 8087
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://${MONGODB_USER:lms_user}:${MONGODB_PASSWORD:lms_password}@mongodb:27017/${MONGODB_DATABASE:lms_notifications}?authSource=admin
+
+  jackson:
+    time-zone: UTC
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+auth:
+  tokens:
+    secret: ${JWT_SECRET:mysuperlongsecretkey_for_docker_12345678901234567890}
+    issuer: http://authservice:8084
+    audience: lms-api
+
+logging:
+  level:
+    org.springframework.data.mongodb: INFO

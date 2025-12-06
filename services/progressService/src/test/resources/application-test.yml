@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: progressService
+
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+    database-platform: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+
+  h2:
+    console:
+      enabled: false
+
+  jackson:
+    time-zone: UTC
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    org.springframework.security: DEBUG
+    org.springframework.test: DEBUG
+    org.hibernate: WARN
+    com.zaxxer.hikari: WARN
