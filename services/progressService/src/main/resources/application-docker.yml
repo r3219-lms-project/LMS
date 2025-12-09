@@ -1,0 +1,56 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: progressService
+  datasource:
+    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB:lms_db}
+    username: ${POSTGRES_USER:lms_user}
+    password: ${POSTGRES_PASSWORD:lms_password}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+
+  jackson:
+    time-zone: UTC
+
+  sql:
+    init:
+      mode: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      roles: ADMIN
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+auth:
+  tokens:
+    secret: ${JWT_SECRET:mysuperlongsecretkey_for_docker_12345678901234567890}
+  userservice:
+    base-url: http://userservice:8082/api/v1/users
+  courseservice:
+    base-url: http://courseservice:8083/api/v1/courses
+
+logging:
+  level:
+    org.springframework.web: INFO

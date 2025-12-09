@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  build-services:
-    name: Build ${{ matrix.service }}
+  build-db-services:
+    name: Build DB service ${{ matrix.service }}
     runs-on: ubuntu-latest
 
     services:
@@ -43,10 +43,7 @@ jobs:
     strategy:
       matrix:
         service:
-          - 'services:common-security'
-          - 'services:authservice'
           - 'services:courseService'
-          - 'services:userservice'
       fail-fast: false
 
     steps:
@@ -71,19 +68,52 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: lms_password
           SPRING_DATA_MONGODB_URI: mongodb://admin:admin_password@localhost:27017/lms_mongo_db?authSource=admin
 
+  build-h2-services:
+    name: Build H2 service ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - 'services:common-security'
+          - 'services:authservice'
+          - 'services:userservice'
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build and test ${{ matrix.service }}
+        run: ./gradlew :"${{ matrix.service }}":clean :"${{ matrix.service }}":build
+        env:
+          SPRING_PROFILES_ACTIVE: test
+
   build-summary:
     name: Build Summary
-    needs: build-services
+    needs:
+      - build-db-services
+      - build-h2-services
     runs-on: ubuntu-latest
     if: always()
 
     steps:
       - name: Check build status
-        if: ${{ needs.build-services.result == 'success' }}
+        if: ${{ needs.build-db-services.result == 'success' && needs.build-h2-services.result == 'success' }}
         run: echo "✅ All tests are passed!"
 
       - name: Report failure
-        if: ${{ needs.build-services.result != 'success' }}
+        if: ${{ needs.build-db-services.result != 'success' || needs.build-h2-services.result != 'success' }}
         run: |
           echo "❌ Error. Can't build one or more services"
           exit 1
